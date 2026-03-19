@@ -17,14 +17,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Registro de Usuario'),
+        title: const Text('Únete a TacoHub'),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.person_add, size: 100, color: Colors.blue),
+            const Icon(Icons.person_add, size: 80, color: Colors.orange),
+            const SizedBox(height: 20),
+            const Text(
+              'Crea tu cuenta',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 32),
             TextField(
               controller: _nameController,
@@ -67,23 +73,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                // Al registrarse, simulamos éxito y volvemos al login
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Registro exitoso. Por favor inicia sesión.')),
+                  const SnackBar(content: Text('¡Bienvenido a TacoHub! Ahora inicia sesión.')),
                 );
-                Navigator.pop(context); 
+                Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(50),
               ),
-              child: const Text('Crear Cuenta'),
+              child: const Text('Registrarme en TacoHub'),
             ),
             const SizedBox(height: 16),
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: const Text('¿Ya tienes cuenta? Inicia sesión'),
+              child: const Text('¿Ya eres parte de TacoHub? Inicia sesión'),
             ),
           ],
         ),

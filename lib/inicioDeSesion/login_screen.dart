@@ -15,14 +15,24 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inicio de Sesión'),
+        title: const Text('TacoHub - Bienvenidos'),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const FlutterLogo(size: 100),
+            const Icon(Icons.restaurant_menu, size: 100, color: Colors.orange),
+            const SizedBox(height: 10),
+            const Text(
+              'TacoHub',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
+              ),
+            ),
             const SizedBox(height: 32),
             TextField(
               controller: _emailController,
@@ -46,10 +56,11 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                // Navegar al menú inicial
                 Navigator.pushReplacementNamed(context, '/home');
               },
               style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(50),
               ),
               child: const Text('Iniciar Sesión'),
@@ -59,12 +70,10 @@ class _LoginScreenState extends State<LoginScreen> {
               onPressed: () {
                 Navigator.pushNamed(context, '/registro');
               },
-              child: const Text('¿No tienes cuenta? Regístrate aquí'),
+              child: const Text('¿No tienes cuenta? Únete a TacoHub'),
             ),
             TextButton(
-              onPressed: () {
-                // Recuperar contraseña
-              },
+              onPressed: () {},
               child: const Text('¿Olvidaste tu contraseña?'),
             ),
           ],
