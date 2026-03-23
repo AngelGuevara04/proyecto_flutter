@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../user_storage.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -56,7 +57,22 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, '/home');
+                final user = UserStorage.login(
+                  _emailController.text.trim(),
+                  _passwordController.text,
+                );
+
+                if (user != null) {
+                  if (user.isBusiness) {
+                    Navigator.pushReplacementNamed(context, '/home_negocio');
+                  } else {
+                    Navigator.pushReplacementNamed(context, '/home');
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Usuario o contraseña incorrectos')),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,

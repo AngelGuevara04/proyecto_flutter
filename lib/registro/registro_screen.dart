@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../user_storage.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -12,6 +13,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  bool _isBusiness = false;
 
   @override
   Widget build(BuildContext context) {
@@ -70,9 +72,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               obscureText: true,
             ),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              title: const Text("Soy un negocio (Taquería)"),
+              value: _isBusiness,
+              onChanged: (bool? value) {
+                setState(() {
+                  _isBusiness = value ?? false;
+                });
+              },
+              controlAffinity: ListTileControlAffinity.leading,
+              activeColor: Colors.orange,
+            ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () {
+                if (_passwordController.text != _confirmPasswordController.text) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Las contraseñas no coinciden')),
+                  );
+                  return;
+                }
+
+                if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Por favor completa los campos')),
+                  );
+                  return;
+                }
+
+                UserStorage.addUser(UserData(
+                  name: _nameController.text,
+                  email: _emailController.text,
+                  password: _passwordController.text,
+                  isBusiness: _isBusiness,
+                ));
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('¡Bienvenido a TacoHub! Ahora inicia sesión.')),
                 );
