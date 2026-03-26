@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../user_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,6 +11,97 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  final supabase = Supabase.instance.client;
+
+  // Lista de dominios comunes (se puede ampliar)
+  final List<String> _commonDomains = [
+    'gmail.com',
+    'outlook.com',
+    'hotmail.com',
+    'yahoo.com',
+    'icloud.com',
+    'live.com',
+    'msn.com',
+    'comunidad.unam.mx',
+    'itesm.mx',
+    'protonmail.com',
+  ];
+
+  Future<void> _signIn() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor completa los campos')),
+      );
+      return;
+    }
+
+    // Validación de formato de correo y dominio
+    final emailParts = email.split('@');
+    if (emailParts.length != 2 || emailParts[1].isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El formato del correo es inválido')),
+      );
+      return;
+    }
+
+    final domain = emailParts[1].toLowerCase();
+    // Validación general de estructura de dominio (ejemplo: dominio.com)
+    final domainRegex = RegExp(r'^[\w-]+\.+[\w-]{2,4}$');
+    if (!domainRegex.hasMatch(domain)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('El dominio del correo es incorrecto')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      if (response.user != null) {
+        final isBusiness = response.user!.userMetadata?['is_business'] ?? false;
+        if (mounted) {
+          if (isBusiness) {
+            Navigator.pushReplacementNamed(context, '/home_negocio');
+          } else {
+            Navigator.pushReplacementNamed(context, '/home');
+          }
+        }
+      }
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message), backgroundColor: Colors.red),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Ocurrió un error inesperado'),
+              backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,39 +138,34 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 16),
             TextField(
               controller: _passwordController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Contraseña',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.lock),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.lock),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
               ),
-              obscureText: true,
+              obscureText: _obscurePassword,
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () {
-                final user = UserStorage.login(
-                  _emailController.text.trim(),
-                  _passwordController.text,
-                );
-
-                if (user != null) {
-                  if (user.isBusiness) {
-                    Navigator.pushReplacementNamed(context, '/home_negocio');
-                  } else {
-                    Navigator.pushReplacementNamed(context, '/home');
-                  }
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Usuario o contraseña incorrectos')),
-                  );
-                }
-              },
+              onPressed: _isLoading ? null : _signIn,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
                 minimumSize: const Size.fromHeight(50),
               ),
-              child: const Text('Iniciar Sesión'),
+              child: _isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Iniciar Sesión'),
             ),
             const SizedBox(height: 8),
             TextButton(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InicioScreen extends StatelessWidget {
   const InicioScreen({super.key});
@@ -11,12 +12,20 @@ class InicioScreen extends StatelessWidget {
         centerTitle: true,
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.person),
+          onPressed: () {
+            Navigator.pushNamed(context, '/perfil');
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              // Regresar al login y quitar todas las pantallas anteriores
-              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              }
             },
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InicioNegocioScreen extends StatelessWidget {
   const InicioNegocioScreen({super.key});
@@ -14,8 +15,11 @@ class InicioNegocioScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+            onPressed: () async {
+              await Supabase.instance.client.auth.signOut();
+              if (context.mounted) {
+                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              }
             },
           ),
         ],
