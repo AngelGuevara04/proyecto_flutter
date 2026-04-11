@@ -14,11 +14,20 @@ dependencies:
   supabase_flutter: ^2.6.0
   geolocator: ^13.0.1
   geocoding: ^3.0.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  provider: ^6.1.5+1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1
   flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: "launcher_icon2"
+  ios: true
+  image_path: "assets/app_icon2.png"
