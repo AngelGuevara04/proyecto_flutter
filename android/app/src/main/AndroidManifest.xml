@@ -5,7 +5,7 @@
     <application
         android:label="TacoHub"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon2">
+        android:icon="@mipmap/ic_launcher">
 
         <activity
             android:name=".MainActivity"
