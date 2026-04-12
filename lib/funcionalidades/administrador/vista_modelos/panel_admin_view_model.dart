@@ -8,6 +8,10 @@ class PanelAdminViewModel extends ChangeNotifier {
   int _indiceTab = 0;
   int get indiceTab => _indiceTab;
 
+  // Estado del sub-menú de apelaciones (0: Pendientes, 1: Historial)
+  int _indiceSubTabApelacion = 0;
+  int get indiceSubTabApelacion => _indiceSubTabApelacion;
+
   List<Map<String, dynamic>> _solicitudesPendientes = [];
   List<Map<String, dynamic>> get solicitudesPendientes => _solicitudesPendientes;
 
@@ -18,8 +22,10 @@ class PanelAdminViewModel extends ChangeNotifier {
   List<Map<String, dynamic>> _reportes = [];
   List<Map<String, dynamic>> get reportes => _reportes;
 
+  // APELACIONES FILTRADAS
   List<dynamic> _apelaciones = [];
-  List<dynamic> get apelaciones => _apelaciones;
+  List<dynamic> get apelacionesPendientes => _apelaciones.where((a) => a['estatus'] == 'pendiente').toList();
+  List<dynamic> get apelacionesHistorico => _apelaciones.where((a) => a['estatus'] != 'pendiente').toList();
 
   bool _estaCargando = false;
   bool get estaCargando => _estaCargando;
@@ -27,6 +33,11 @@ class PanelAdminViewModel extends ChangeNotifier {
   void cambiarTab(int indice) {
     _indiceTab = indice;
     cargarDatosTabActual();
+    notifyListeners();
+  }
+
+  void cambiarSubTabApelacion(int indice) {
+    _indiceSubTabApelacion = indice;
     notifyListeners();
   }
 
@@ -44,46 +55,45 @@ class PanelAdminViewModel extends ChangeNotifier {
         _todosLosUsuarios = List<dynamic>.from(respuestaRpc);
       }
       else if (_indiceTab == 3) {
-        // TAB 3: REPORTES (Ahora usa RPC)
         final respuestaRpc = await _supabase.rpc('admin_obtener_reportes');
         if (respuestaRpc != null) {
-          if (respuestaRpc is String) {
-            _reportes = List<Map<String, dynamic>>.from(jsonDecode(respuestaRpc));
-          } else {
-            _reportes = List<Map<String, dynamic>>.from(respuestaRpc);
-          }
-        } else {
-          _reportes = [];
-        }
+          _reportes = List<Map<String, dynamic>>.from(respuestaRpc is String ? jsonDecode(respuestaRpc) : respuestaRpc);
+        } else { _reportes = []; }
       }
       else if (_indiceTab == 4) {
-        // TAB 4: APELACIONES
         final respuestaRpc = await _supabase.rpc('admin_obtener_apelaciones');
         if (respuestaRpc != null) {
-          if (respuestaRpc is String) {
-            _apelaciones = List<dynamic>.from(jsonDecode(respuestaRpc));
-          } else {
-            _apelaciones = List<dynamic>.from(respuestaRpc);
-          }
-        } else {
-          _apelaciones = [];
-        }
+          _apelaciones = List<dynamic>.from(respuestaRpc is String ? jsonDecode(respuestaRpc) : respuestaRpc);
+        } else { _apelaciones = []; }
       }
     } catch (e) {
-      debugPrint('🚨 ERROR CRÍTICO EN ADMIN: $e');
+      debugPrint('🚨 ERROR EN ADMIN: $e');
     } finally {
       _estaCargando = false;
       notifyListeners();
     }
   }
 
-  Future<void> gestionarSolicitud(String idSolicitud, String usuarioId, String nuevoEstatus) async {
+  // AHORA RECIBE EL MOTIVO Y CAMBIA EL ESTATUS DEL USUARIO
+  Future<String?> gestionarSolicitud(String idSolicitud, String usuarioId, String nuevoEstatus, [String motivo = '']) async {
     try {
-      await _supabase.from('solicitudes_registro').update({'estatus': nuevoEstatus}).eq('id', idSolicitud);
+      // 1. Actualizamos la solicitud en la tabla
+      await _supabase.from('solicitudes_registro').update({
+        'estatus': nuevoEstatus,
+        'motivo_rechazo': motivo.isEmpty ? null : motivo
+      }).eq('id', idSolicitud);
+
+      // 2. Disparamos el RPC para cambiar el metadato del usuario (para el Semáforo)
+      await _supabase.rpc('admin_actualizar_estatus_negocio', params: {
+        'uid': usuarioId,
+        'nuevo_estatus': nuevoEstatus
+      });
+
       _solicitudesPendientes.removeWhere((s) => s['id'] == idSolicitud);
       notifyListeners();
+      return null;
     } catch (e) {
-      debugPrint('Error al gestionar solicitud: $e');
+      return 'Error al procesar: $e';
     }
   }
 
@@ -106,7 +116,7 @@ class PanelAdminViewModel extends ChangeNotifier {
       }
 
       await cargarDatosTabActual();
-      return aprobada ? 'Usuario Desbaneado con éxito' : 'Apelación rechazada';
+      return aprobada ? 'Usuario Desbaneado' : 'Apelación rechazada definitivamente';
     } catch (e) {
       return 'Error al procesar: $e';
     }
