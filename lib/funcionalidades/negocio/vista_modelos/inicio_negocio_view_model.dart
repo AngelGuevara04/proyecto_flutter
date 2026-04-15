@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -9,6 +10,10 @@ class InicioNegocioViewModel extends ChangeNotifier {
 
   int _indiceTab = 0;
   int get indiceTab => _indiceTab;
+
+  // Sub-tab de pedidos: 0 = Activos, 1 = Exprés disponibles
+  int _indiceSubTabPedidos = 0;
+  int get indiceSubTabPedidos => _indiceSubTabPedidos;
 
   bool _estaCargando = true;
   bool get estaCargando => _estaCargando;
@@ -37,10 +42,15 @@ class InicioNegocioViewModel extends ChangeNotifier {
   List<dynamic> _historialPedidos = [];
   List<dynamic> get historialPedidos => _historialPedidos;
 
+  List<Map<String, dynamic>> _pedidosExpresDisponibles = [];
+  List<Map<String, dynamic>> get pedidosExpresDisponibles =>
+      _pedidosExpresDisponibles;
+
   List<String> get galeriaFotos {
     if (_perfil == null || _perfil!['galeria_fotos'] == null) return [];
     var data = _perfil!['galeria_fotos'];
-    List<dynamic> lista = data is String ? jsonDecode(data) : List.from(data);
+    List<dynamic> lista =
+    data is String ? jsonDecode(data) : List.from(data);
     return lista.map((e) => e.toString()).toList();
   }
 
@@ -53,19 +63,35 @@ class InicioNegocioViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void cambiarSubTabPedidos(int indice) {
+    _indiceSubTabPedidos = indice;
+    if (indice == 1) cargarPedidosExpresDisponibles();
+    notifyListeners();
+  }
+
   Future<void> cargarDatosPerfil() async {
     _estaCargando = true;
     notifyListeners();
     try {
       final uid = _supabase.auth.currentUser!.id;
 
-      final datosPerfil = await _supabase.from('perfiles_negocios').select().eq('usuario_id', uid).maybeSingle();
+      final datosPerfil = await _supabase
+          .from('perfiles_negocios')
+          .select()
+          .eq('usuario_id', uid)
+          .maybeSingle();
       _perfil = datosPerfil;
 
-      if (datosPerfil != null && datosPerfil['nombre_comercial'] != null && datosPerfil['nombre_comercial'].toString().isNotEmpty) {
+      if (datosPerfil != null &&
+          datosPerfil['nombre_comercial'] != null &&
+          datosPerfil['nombre_comercial'].toString().isNotEmpty) {
         _nombreComercial = datosPerfil['nombre_comercial'];
       } else {
-        final solicitud = await _supabase.from('solicitudes_registro').select('nombre_comercial').eq('usuario_id', uid).maybeSingle();
+        final solicitud = await _supabase
+            .from('solicitudes_registro')
+            .select('nombre_comercial')
+            .eq('usuario_id', uid)
+            .maybeSingle();
         if (solicitud != null && solicitud['nombre_comercial'] != null) {
           _nombreComercial = solicitud['nombre_comercial'];
         }
@@ -75,7 +101,6 @@ class InicioNegocioViewModel extends ChangeNotifier {
       await cargarEstadisticasHoy();
       await cargarPedidosActivos();
       await cargarHistorial();
-
     } catch (e) {
       debugPrint('Error crítico cargando perfil: $e');
     } finally {
@@ -89,11 +114,12 @@ class InicioNegocioViewModel extends ChangeNotifier {
     await cargarPedidosActivos();
     await cargarProductos();
     await cargarHistorial();
+    if (_indiceSubTabPedidos == 1) await cargarPedidosExpresDisponibles();
   }
 
-  // ==========================================
-  // GESTIÓN DE PEDIDOS Y HISTORIAL
-  // ==========================================
+  // ══════════════════════════════════════════
+  // PEDIDOS ACTIVOS E HISTORIAL
+  // ══════════════════════════════════════════
 
   Future<void> cargarPedidosActivos() async {
     try {
@@ -105,7 +131,6 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .neq('estado', 'entregado')
           .neq('estado', 'cancelado')
           .order('creado_el', ascending: false);
-
       _pedidosActivos = datos;
       notifyListeners();
     } catch (e) {
@@ -123,7 +148,6 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .or('estado.eq.entregado,estado.eq.cancelado')
           .order('creado_el', ascending: false)
           .limit(50);
-
       _historialPedidos = datos;
       notifyListeners();
     } catch (e) {
@@ -131,19 +155,20 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> actualizarEstadoPedido(String idPedido, String nuevoEstado) async {
+  Future<void> actualizarEstadoPedido(
+      String idPedido, String nuevoEstado) async {
     try {
       _estaCargando = true;
       notifyListeners();
-
       Map<String, dynamic> datosActualizar = {'estado': nuevoEstado};
-
       if (nuevoEstado == 'entregado') {
-        datosActualizar['entregado_el'] = DateTime.now().toUtc().toIso8601String();
+        datosActualizar['entregado_el'] =
+            DateTime.now().toUtc().toIso8601String();
       }
-
-      await _supabase.from('pedidos').update(datosActualizar).eq('id', idPedido);
-
+      await _supabase
+          .from('pedidos')
+          .update(datosActualizar)
+          .eq('id', idPedido);
       await cargarPedidosActivos();
       await cargarHistorial();
       await cargarEstadisticasHoy();
@@ -155,45 +180,121 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
-  // AHORA EL PEDIDO DE PRUEBA INCLUYE UN CORREO FALSO
-  /*Future<void> generarPedidoDePrueba() async {
+  // ══════════════════════════════════════════
+  // MODO EXPRÉS — LADO TAQUERÍA
+  // ══════════════════════════════════════════
+
+  Future<void> cargarPedidosExpresDisponibles() async {
+    try {
+      // 1. Obtener pedidos exprés sin taquería asignada
+      final pedidos = await _supabase
+          .from('pedidos')
+          .select()
+          .eq('tipo', 'expres')
+          .eq('estado', 'buscando');
+
+      // 2. Obtener la ubicación de esta taquería
+      final lat = (_perfil?['latitud'] ?? 0).toDouble();
+      final lng = (_perfil?['longitud'] ?? 0).toDouble();
+
+      // 3. Límite de saturación: máximo 5 pedidos activos
+      final saturado = _pedidosActivos.length >= 5;
+
+      List<Map<String, dynamic>> filtrados = [];
+
+      for (var pedido in pedidos) {
+        if (saturado) break;
+
+        final latP = (pedido['lat_cliente'] ?? 0).toDouble();
+        final lngP = (pedido['lng_cliente'] ?? 0).toDouble();
+
+        // Si tiene ubicación, filtrar por distancia (5 km)
+        if (lat != 0 && lng != 0 && latP != 0 && lngP != 0) {
+          final distancia = _calcularDistanciaKm(lat, lng, latP, lngP);
+          if (distancia <= 5.0) {
+            filtrados.add({
+              ...Map<String, dynamic>.from(pedido),
+              'distancia_km': distancia.toStringAsFixed(1),
+            });
+          }
+        } else {
+          // Sin datos de ubicación, mostrar de todas formas
+          filtrados.add({
+            ...Map<String, dynamic>.from(pedido),
+            'distancia_km': '?',
+          });
+        }
+      }
+
+      _pedidosExpresDisponibles = filtrados;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error cargando exprés disponibles: $e');
+    }
+  }
+
+  Future<String?> reclamarPedidoExpres(String pedidoId) async {
     try {
       _estaCargando = true;
       notifyListeners();
+
       final uid = _supabase.auth.currentUser!.id;
 
-      await _supabase.from('pedidos').insert({
+      // Verificar que nadie más lo haya tomado
+      final actual = await _supabase
+          .from('pedidos')
+          .select('estado')
+          .eq('id', pedidoId)
+          .single();
+
+      if (actual['estado'] != 'buscando') {
+        return 'Este pedido ya fue tomado por otra taquería ⚡';
+      }
+
+      // Reclamar
+      await _supabase.from('pedidos').update({
         'negocio_id': uid,
-        'nombre_cliente': 'Cliente de Prueba',
-        'cliente_email': 'cliente.broma@gmail.com', // <--- CORREO SIMULADO
-        'direccion_entrega': 'Calle de los Tacos #10, Misantla',
-        'productos': [
-          {'cantidad': 5, 'nombre': 'Tacos de Bistec', 'detalles': 'Con mucha salsa'},
-          {'cantidad': 2, 'nombre': 'Agua de Horchata', 'detalles': ''},
-        ],
-        'total': 130.00,
-        'estado': 'pendiente'
-      });
+        'estado': 'pendiente',
+      }).eq('id', pedidoId);
 
       await cargarPedidosActivos();
-      await cargarEstadisticasHoy();
+      await cargarPedidosExpresDisponibles();
+      return null;
     } catch (e) {
-      debugPrint('Error generando pedido de prueba: $e');
+      return 'Error al reclamar el pedido: $e';
     } finally {
       _estaCargando = false;
       notifyListeners();
     }
-  }*/
+  }
 
-  // ==========================================
+  // Haversine formula para calcular distancia en km
+  double _calcularDistanciaKm(
+      double lat1, double lng1, double lat2, double lng2) {
+    const R = 6371.0;
+    final dLat = _toRad(lat2 - lat1);
+    final dLng = _toRad(lng2 - lng1);
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(_toRad(lat1)) *
+            cos(_toRad(lat2)) *
+            sin(dLng / 2) *
+            sin(dLng / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return R * c;
+  }
+
+  double _toRad(double deg) => deg * pi / 180;
+
+  // ══════════════════════════════════════════
   // ESTADÍSTICAS DEL DÍA
-  // ==========================================
+  // ══════════════════════════════════════════
 
   Future<void> cargarEstadisticasHoy() async {
     try {
       final uid = _supabase.auth.currentUser!.id;
       final hoy = DateTime.now();
-      final inicioDia = DateTime(hoy.year, hoy.month, hoy.day).toUtc().toIso8601String();
+      final inicioDia =
+      DateTime(hoy.year, hoy.month, hoy.day).toUtc().toIso8601String();
 
       final pedidos = await _supabase
           .from('pedidos')
@@ -207,18 +308,16 @@ class InicioNegocioViewModel extends ChangeNotifier {
       int pedidosEntregados = 0;
 
       for (var pedido in pedidos) {
-        if (pedido['estado'] != 'cancelado') {
-          totalPedidos++;
-        }
-
+        if (pedido['estado'] != 'cancelado') totalPedidos++;
         if (pedido['estado'] == 'entregado') {
           sumaGanancias += (pedido['total'] ?? 0).toDouble();
-
-          if (pedido['entregado_el'] != null && pedido['creado_el'] != null) {
-            final creado = DateTime.parse(pedido['creado_el']).toLocal();
-            final entregado = DateTime.parse(pedido['entregado_el']).toLocal();
-            final diferencia = entregado.difference(creado).inMinutes;
-            sumaMinutos += diferencia;
+          if (pedido['entregado_el'] != null &&
+              pedido['creado_el'] != null) {
+            final creado =
+            DateTime.parse(pedido['creado_el']).toLocal();
+            final entregado =
+            DateTime.parse(pedido['entregado_el']).toLocal();
+            sumaMinutos += entregado.difference(creado).inMinutes;
             pedidosEntregados++;
           }
         }
@@ -226,13 +325,9 @@ class InicioNegocioViewModel extends ChangeNotifier {
 
       _pedidosHoy = totalPedidos;
       _gananciasHoy = sumaGanancias;
-
-      if (pedidosEntregados > 0) {
-        int promedio = (sumaMinutos / pedidosEntregados).round();
-        _tiempoPromedioHoy = "$promedio min";
-      } else {
-        _tiempoPromedioHoy = "-- min";
-      }
+      _tiempoPromedioHoy = pedidosEntregados > 0
+          ? "${(sumaMinutos / pedidosEntregados).round()} min"
+          : "-- min";
 
       notifyListeners();
     } catch (e) {
@@ -240,21 +335,31 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
-  // ==========================================
+  // ══════════════════════════════════════════
   // PRODUCTOS Y PERFIL
-  // ==========================================
+  // ══════════════════════════════════════════
 
   Future<void> cargarProductos() async {
     try {
       final uid = _supabase.auth.currentUser!.id;
-      final datosProductos = await _supabase.from('productos').select().eq('negocio_id', uid).order('creado_el');
-      _productos = datosProductos;
+      final datos = await _supabase
+          .from('productos')
+          .select()
+          .eq('negocio_id', uid)
+          .order('creado_el');
+      _productos = datos;
       notifyListeners();
     } catch (e) {}
   }
 
   Future<String?> agregarProducto({
-    required String nombre, required String descripcion, required double precio, required String categoria, required bool permitePersonalizacion, required String palabrasClave, File? imagen,
+    required String nombre,
+    required String descripcion,
+    required double precio,
+    required String categoria,
+    required bool permitePersonalizacion,
+    required String palabrasClave,
+    File? imagen,
   }) async {
     _estaCargando = true;
     notifyListeners();
@@ -263,38 +368,141 @@ class InicioNegocioViewModel extends ChangeNotifier {
       String? urlImagen;
       if (imagen != null) {
         final ext = imagen.path.split('.').last;
-        final nombreArchivo = 'producto_${uid}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+        final nombreArchivo =
+            'producto_${uid}_${DateTime.now().millisecondsSinceEpoch}.$ext';
         final ruta = 'productos/$nombreArchivo';
-        await _supabase.storage.from('documentos_negocios').upload(ruta, imagen);
-        urlImagen = _supabase.storage.from('documentos_negocios').getPublicUrl(ruta);
+        await _supabase.storage
+            .from('documentos_negocios')
+            .upload(ruta, imagen);
+        urlImagen = _supabase.storage
+            .from('documentos_negocios')
+            .getPublicUrl(ruta);
       }
       await _supabase.from('productos').insert({
-        'negocio_id': uid, 'nombre': nombre, 'descripcion': descripcion, 'precio': precio, 'categoria': categoria, 'permite_personalizacion': permitePersonalizacion, 'palabras_clave': palabrasClave.toLowerCase(), 'url_imagen': urlImagen,
+        'negocio_id': uid,
+        'nombre': nombre,
+        'descripcion': descripcion,
+        'precio': precio,
+        'categoria': categoria,
+        'permite_personalizacion': permitePersonalizacion,
+        'palabras_clave': palabrasClave.toLowerCase(),
+        'url_imagen': urlImagen,
       });
       await cargarProductos();
       return null;
-    } catch (e) { return 'Error: $e'; } finally { _estaCargando = false; notifyListeners(); }
+    } catch (e) {
+      return 'Error: $e';
+    } finally {
+      _estaCargando = false;
+      notifyListeners();
+    }
   }
 
-  Future<void> cambiarDisponibilidadProducto(String idProducto, bool estaDisponible) async {
-    try { await _supabase.from('productos').update({'disponible': estaDisponible}).eq('id', idProducto); await cargarProductos(); } catch (e) {}
+  Future<String?> editarProducto({
+    required String idProducto,
+    required String nombre,
+    required String descripcion,
+    required double precio,
+    required String categoria,
+    required bool permitePersonalizacion,
+    required String palabrasClave,
+    File? nuevaImagen,
+  }) async {
+    _estaCargando = true;
+    notifyListeners();
+    try {
+      final uid = _supabase.auth.currentUser!.id;
+      String? urlImagen;
+
+      if (nuevaImagen != null) {
+        final ext = nuevaImagen.path.split('.').last;
+        final nombreArchivo =
+            'producto_${uid}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+        final ruta = 'productos/$nombreArchivo';
+        await _supabase.storage
+            .from('documentos_negocios')
+            .upload(ruta, nuevaImagen);
+        urlImagen = _supabase.storage
+            .from('documentos_negocios')
+            .getPublicUrl(ruta);
+      }
+
+      final Map<String, dynamic> datos = {
+        'nombre': nombre,
+        'descripcion': descripcion,
+        'precio': precio,
+        'categoria': categoria,
+        'permite_personalizacion': permitePersonalizacion,
+        'palabras_clave': palabrasClave.toLowerCase(),
+      };
+      if (urlImagen != null) datos['url_imagen'] = urlImagen;
+
+      await _supabase
+          .from('productos')
+          .update(datos)
+          .eq('id', idProducto);
+      await cargarProductos();
+      return null;
+    } catch (e) {
+      return 'Error: $e';
+    } finally {
+      _estaCargando = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> cambiarDisponibilidadProducto(
+      String idProducto, bool estaDisponible) async {
+    try {
+      await _supabase
+          .from('productos')
+          .update({'disponible': estaDisponible})
+          .eq('id', idProducto);
+      await cargarProductos();
+    } catch (e) {}
   }
 
   Future<void> eliminarProducto(String idProducto) async {
-    try { _estaCargando = true; notifyListeners(); await _supabase.from('productos').delete().eq('id', idProducto); await cargarProductos(); } catch (e) {} finally { _estaCargando = false; notifyListeners(); }
+    try {
+      _estaCargando = true;
+      notifyListeners();
+      await _supabase.from('productos').delete().eq('id', idProducto);
+      await cargarProductos();
+    } catch (e) {} finally {
+      _estaCargando = false;
+      notifyListeners();
+    }
   }
 
   Future<String?> actualizarInformacionBasica({
-    required String nombre, required String telefono, required String tiempo, required String direccion, required double lat, required double lng, required String tipoEnvio, required double costoEnvio, required double envioGratisDesde,
+    required String nombre,
+    required String telefono,
+    required String tiempo,
+    required String direccion,
+    required double lat,
+    required double lng,
+    required String tipoEnvio,
+    required double costoEnvio,
+    required double envioGratisDesde,
   }) async {
     try {
       final uid = _supabase.auth.currentUser!.id;
       await _supabase.from('perfiles_negocios').update({
-        'nombre_comercial': nombre, 'telefono_movil': telefono, 'tiempo_entrega': tiempo, 'direccion_texto': direccion, 'latitud': lat, 'longitud': lng, 'tipo_envio': tipoEnvio, 'costo_envio': costoEnvio, 'envio_gratis_desde': envioGratisDesde,
+        'nombre_comercial': nombre,
+        'telefono_movil': telefono,
+        'tiempo_entrega': tiempo,
+        'direccion_texto': direccion,
+        'latitud': lat,
+        'longitud': lng,
+        'tipo_envio': tipoEnvio,
+        'costo_envio': costoEnvio,
+        'envio_gratis_desde': envioGratisDesde,
       }).eq('usuario_id', uid);
       await cargarDatosPerfil();
       return null;
-    } catch (e) { return 'Error: $e'; }
+    } catch (e) {
+      return 'Error: $e';
+    }
   }
 
   Future<String?> agregarFotoGaleria() async {
@@ -307,15 +515,29 @@ class InicioNegocioViewModel extends ChangeNotifier {
       final archivo = File(resultado.files.single.path!);
       final uid = _supabase.auth.currentUser!.id;
       final ext = archivo.path.split('.').last;
-      final nombreArchivo = '${uid}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final nombreArchivo =
+          '${uid}_${DateTime.now().millisecondsSinceEpoch}.$ext';
       final ruta = 'galeria/$nombreArchivo';
-      await _supabase.storage.from('documentos_negocios').upload(ruta, archivo);
-      final urlPublica = _supabase.storage.from('documentos_negocios').getPublicUrl(ruta);
-      List<String> fotosActualizadas = List.from(galeriaFotos)..add(urlPublica);
-      await _supabase.from('perfiles_negocios').update({'galeria_fotos': jsonEncode(fotosActualizadas)}).eq('usuario_id', uid);
+      await _supabase.storage
+          .from('documentos_negocios')
+          .upload(ruta, archivo);
+      final urlPublica = _supabase.storage
+          .from('documentos_negocios')
+          .getPublicUrl(ruta);
+      List<String> fotosActualizadas = List.from(galeriaFotos)
+        ..add(urlPublica);
+      await _supabase
+          .from('perfiles_negocios')
+          .update({'galeria_fotos': jsonEncode(fotosActualizadas)})
+          .eq('usuario_id', uid);
       await cargarDatosPerfil();
       return null;
-    } catch (e) { return 'Error: $e'; } finally { _estaCargando = false; notifyListeners(); }
+    } catch (e) {
+      return 'Error: $e';
+    } finally {
+      _estaCargando = false;
+      notifyListeners();
+    }
   }
 
   Future<String?> eliminarFotoGaleria(int index) async {
@@ -325,42 +547,47 @@ class InicioNegocioViewModel extends ChangeNotifier {
       final uid = _supabase.auth.currentUser!.id;
       List<String> fotosActualizadas = List.from(galeriaFotos);
       fotosActualizadas.removeAt(index);
-      await _supabase.from('perfiles_negocios').update({'galeria_fotos': jsonEncode(fotosActualizadas)}).eq('usuario_id', uid);
+      await _supabase
+          .from('perfiles_negocios')
+          .update({'galeria_fotos': jsonEncode(fotosActualizadas)})
+          .eq('usuario_id', uid);
       await cargarDatosPerfil();
       return null;
-    } catch (e) { return 'Error: $e'; } finally { _estaCargando = false; notifyListeners(); }
-  }
-
-  // LÓGICA DE REPORTE ACTUALIZADA PARA RECIBIR IDs EXACTOS Y EL CORREO DEL CLIENTE
-  Future<String?> levantarReporte({
-    required String pedidoId,
-    required String clienteEmail,
-    required String motivo,
-    required String detalles
-  }) async {
-    _estaCargando = true;
-    notifyListeners();
-    try {
-      final uid = _supabase.auth.currentUser!.id;
-
-      await _supabase.from('reportes').insert({
-        'negocio_id': uid,
-        'pedido_id': pedidoId,
-        'cliente_email': clienteEmail,
-        'referencia_cliente': 'Reporte Automático desde Pedido', // Valor legacy de respaldo
-        'motivo': motivo,
-        'detalles': detalles,
-      });
-
-      return null;
     } catch (e) {
-      debugPrint('Error al enviar reporte: $e');
-      return 'Ocurrió un error al enviar el reporte. Intenta de nuevo.';
+      return 'Error: $e';
     } finally {
       _estaCargando = false;
       notifyListeners();
     }
   }
 
-  Future<void> cerrarSesion() async => await _supabase.auth.signOut();
+  Future<String?> levantarReporte({
+    required String pedidoId,
+    required String clienteEmail,
+    required String motivo,
+    required String detalles,
+  }) async {
+    _estaCargando = true;
+    notifyListeners();
+    try {
+      final uid = _supabase.auth.currentUser!.id;
+      await _supabase.from('reportes').insert({
+        'negocio_id': uid,
+        'pedido_id': pedidoId,
+        'cliente_email': clienteEmail,
+        'referencia_cliente': 'Reporte Automático desde Pedido',
+        'motivo': motivo,
+        'detalles': detalles,
+      });
+      return null;
+    } catch (e) {
+      return 'Ocurrió un error al enviar el reporte.';
+    } finally {
+      _estaCargando = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> cerrarSesion() async =>
+      await _supabase.auth.signOut();
 }

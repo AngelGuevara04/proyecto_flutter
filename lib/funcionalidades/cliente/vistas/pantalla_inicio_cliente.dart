@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../vista_modelos/inicio_cliente_view_model.dart';
+import '../vista_modelos/expres_view_model.dart';
 import 'pantalla_lista_taquerias.dart';
 import 'pantalla_mis_pedidos_cliente.dart';
+import 'pantalla_modulo_expres.dart';
 import '../../perfil/vistas/pantalla_perfil.dart';
 import '../../perfil/vista_modelos/perfil_view_model.dart';
 
@@ -19,7 +21,8 @@ class PantallaInicioCliente extends StatelessWidget {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('TacoHub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+            const Text('TacoHub',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
             Text('Hola, ${viewModel.nombreUsuario.split(' ').first} 👋',
                 style: const TextStyle(fontSize: 13)),
           ],
@@ -29,7 +32,8 @@ class PantallaInicioCliente extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () => Navigator.push(context,
+            onPressed: () => Navigator.push(
+                context,
                 MaterialPageRoute(
                     builder: (_) => ChangeNotifierProvider(
                         create: (_) => PerfilViewModel(),
@@ -82,8 +86,12 @@ class PantallaInicioCliente extends StatelessWidget {
                       label: 'Modo Exprés',
                       color: Colors.deepOrange,
                       subtitulo: 'Pedido rápido',
-                      onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Próximamente: Modo Exprés'))),
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ChangeNotifierProvider(
+                                  create: (_) => ExpresViewModel(),
+                                  child: const PantallaModuloExpres()))),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -105,30 +113,35 @@ class PantallaInicioCliente extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Lista de taquerías
+              // Título lista
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text('Taquerías disponibles',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold)),
                   Text('${viewModel.taqueriasFiltradas.length} encontradas',
-                      style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      style:
+                      const TextStyle(color: Colors.grey, fontSize: 13)),
                 ],
               ),
               const SizedBox(height: 12),
 
+              // Lista de taquerías
               viewModel.estaCargando
                   ? const Center(
                   child: Padding(
                     padding: EdgeInsets.all(40),
-                    child: CircularProgressIndicator(color: Colors.orange),
+                    child:
+                    CircularProgressIndicator(color: Colors.orange),
                   ))
                   : viewModel.taqueriasFiltradas.isEmpty
                   ? const Center(
                   child: Padding(
                     padding: EdgeInsets.all(40),
                     child: Column(children: [
-                      Icon(Icons.storefront_outlined, size: 60, color: Colors.grey),
+                      Icon(Icons.storefront_outlined,
+                          size: 60, color: Colors.grey),
                       SizedBox(height: 12),
                       Text('No hay taquerías disponibles',
                           style: TextStyle(color: Colors.grey)),
@@ -150,12 +163,14 @@ class PantallaInicioCliente extends StatelessWidget {
     );
   }
 
-  Widget _tarjetaAccion(BuildContext context,
-      {required IconData icono,
+  Widget _tarjetaAccion(
+      BuildContext context, {
+        required IconData icono,
         required String label,
         required String subtitulo,
         required Color color,
-        required VoidCallback onTap}) {
+        required VoidCallback onTap,
+      }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -177,7 +192,8 @@ class PantallaInicioCliente extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         fontSize: 14)),
                 Text(subtitulo,
-                    style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                    style: const TextStyle(
+                        color: Colors.white70, fontSize: 11)),
               ],
             )
           ],
@@ -186,10 +202,11 @@ class PantallaInicioCliente extends StatelessWidget {
     );
   }
 
-  Widget _tarjetaTaqueria(BuildContext context, Map<String, dynamic> taqueria) {
+  Widget _tarjetaTaqueria(
+      BuildContext context, Map<String, dynamic> taqueria) {
     final fotos = taqueria['galeria_fotos'];
     String? urlFoto;
-    if (fotos != null && fotos.isNotEmpty) {
+    if (fotos != null) {
       final lista = fotos is List ? fotos : [];
       if (lista.isNotEmpty) urlFoto = lista[0].toString();
     }
@@ -198,11 +215,11 @@ class PantallaInicioCliente extends StatelessWidget {
       onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) =>
-                  PantallaListaTaquerias(taqueria: taqueria))),
+              builder: (_) => PantallaListaTaquerias(taqueria: taqueria))),
       child: Card(
         margin: const EdgeInsets.only(bottom: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 2,
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -216,7 +233,8 @@ class PantallaInicioCliente extends StatelessWidget {
               child: urlFoto != null
                   ? Image.network(urlFoto, fit: BoxFit.cover)
                   : const Center(
-                  child: Icon(Icons.storefront, size: 50, color: Colors.grey)),
+                  child: Icon(Icons.storefront,
+                      size: 50, color: Colors.grey)),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -229,7 +247,8 @@ class PantallaInicioCliente extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                      const Icon(Icons.location_on,
+                          size: 14, color: Colors.grey),
                       const SizedBox(width: 4),
                       Expanded(
                           child: Text(
@@ -244,10 +263,15 @@ class PantallaInicioCliente extends StatelessWidget {
                   Row(
                     children: [
                       _chip(Icons.timer,
-                          taqueria['tiempo_entrega'] ?? '-- min', Colors.orange),
+                          taqueria['tiempo_entrega'] ?? '-- min',
+                          Colors.orange),
                       const SizedBox(width: 8),
-                      _chip(Icons.star,
-                          (taqueria['estrellas'] ?? 5.0).toString(), Colors.amber),
+                      _chip(
+                          Icons.star,
+                          (taqueria['estrellas'] ?? 5.0).toString(),
+                          Colors.amber),
+                      const SizedBox(width: 8),
+                      _chip(Icons.payments, 'Efectivo', Colors.green),
                     ],
                   )
                 ],
@@ -270,7 +294,11 @@ class PantallaInicioCliente extends StatelessWidget {
         children: [
           Icon(icono, size: 13, color: color),
           const SizedBox(width: 4),
-          Text(texto, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+          Text(texto,
+              style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold)),
         ],
       ),
     );

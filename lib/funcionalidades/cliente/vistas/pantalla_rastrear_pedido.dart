@@ -7,7 +7,8 @@ class PantallaRastrearPedido extends StatefulWidget {
   const PantallaRastrearPedido({super.key, required this.pedidoId});
 
   @override
-  State<PantallaRastrearPedido> createState() => _PantallaRastrearPedidoState();
+  State<PantallaRastrearPedido> createState() =>
+      _PantallaRastrearPedidoState();
 }
 
 class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
@@ -23,29 +24,51 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
   Widget build(BuildContext context) {
     final vm = context.watch<PedidoClienteViewModel>();
     final pedido = vm.pedidoActivo;
-    final estado = pedido?['estado'] ?? 'pendiente';
+    final estado = pedido?['estado'] ?? 'buscando';
+    final esExpres = pedido?['tipo'] == 'expres';
 
-    final pasos = ['pendiente', 'aceptado', 'preparacion', 'reparto', 'entregado'];
+    final pasos = esExpres
+        ? ['buscando', 'pendiente', 'aceptado', 'preparacion', 'reparto', 'entregado']
+        : ['pendiente', 'aceptado', 'preparacion', 'reparto', 'entregado'];
+
+    final etiquetas = esExpres
+        ? ['Buscando taquería', 'Pedido recibido', 'Aceptado', 'En preparación', 'En camino', 'Entregado']
+        : ['Pedido enviado', 'Aceptado', 'En preparación', 'En camino', 'Entregado'];
+
     final indiceActual = pasos.indexOf(estado);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rastreando pedido'),
-        backgroundColor: Colors.orange,
+        title: Text(esExpres ? 'Pedido Exprés ⚡' : 'Rastreando pedido'),
+        backgroundColor: esExpres ? Colors.deepOrange : Colors.orange,
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
       ),
       body: pedido == null
-          ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+          ? const Center(
+          child: CircularProgressIndicator(color: Colors.orange))
           : Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            const Icon(Icons.delivery_dining, size: 80, color: Colors.orange),
+            Icon(
+              estado == 'buscando'
+                  ? Icons.search
+                  : estado == 'entregado'
+                  ? Icons.check_circle
+                  : Icons.delivery_dining,
+              size: 80,
+              color: estado == 'buscando'
+                  ? Colors.deepOrange
+                  : estado == 'entregado'
+                  ? Colors.green
+                  : Colors.orange,
+            ),
             const SizedBox(height: 16),
             Text(
               _textoEstado(estado),
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -54,10 +77,72 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
                 textAlign: TextAlign.center),
             const SizedBox(height: 32),
 
-            // Timeline de estados
-            ..._construirTimeline(pasos, indiceActual),
-
-            const Spacer(),
+            // Timeline
+            Expanded(
+              child: ListView(
+                children: List.generate(pasos.length, (i) {
+                  final completado = i <= indiceActual;
+                  final esActual = i == indiceActual;
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Column(
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                                color: completado
+                                    ? (esExpres
+                                    ? Colors.deepOrange
+                                    : Colors.orange)
+                                    : Colors.grey.shade200,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: esActual
+                                        ? Colors.deepOrange
+                                        : Colors.transparent,
+                                    width: 2)),
+                            child: Icon(
+                                completado
+                                    ? Icons.check
+                                    : Icons.circle,
+                                size: 14,
+                                color: completado
+                                    ? Colors.white
+                                    : Colors.grey),
+                          ),
+                          if (i < pasos.length - 1)
+                            Container(
+                                width: 2,
+                                height: 30,
+                                color: i < indiceActual
+                                    ? (esExpres
+                                    ? Colors.deepOrange
+                                    : Colors.orange)
+                                    : Colors.grey.shade300),
+                        ],
+                      ),
+                      const SizedBox(width: 12),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 30),
+                        child: Text(
+                          etiquetas[i],
+                          style: TextStyle(
+                              fontWeight: esActual
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: completado
+                                  ? Colors.black87
+                                  : Colors.grey,
+                              fontSize: 15),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ),
 
             if (estado == 'reparto')
               ElevatedButton.icon(
@@ -71,7 +156,8 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
                   }
                 },
                 icon: const Icon(Icons.check_circle),
-                label: const Text('Confirmar que recibí mi pedido'),
+                label:
+                const Text('Confirmar que recibí mi pedido'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
@@ -80,7 +166,8 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
               ),
 
             if (estado == 'entregado') ...[
-              const Icon(Icons.check_circle, size: 60, color: Colors.green),
+              const Icon(Icons.check_circle,
+                  size: 60, color: Colors.green),
               const SizedBox(height: 10),
               const Text('¡Pedido entregado!',
                   style: TextStyle(
@@ -97,66 +184,26 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
                     minimumSize: const Size.fromHeight(50)),
                 child: const Text('Volver al inicio'),
               ),
-            ]
+            ],
+
+            if (estado == 'buscando') ...[
+              const SizedBox(height: 16),
+              const LinearProgressIndicator(color: Colors.deepOrange),
+              const SizedBox(height: 8),
+              const Text(
+                  'Esperando que una taquería tome tu pedido...',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                  textAlign: TextAlign.center),
+            ],
           ],
         ),
       ),
     );
   }
 
-  List<Widget> _construirTimeline(List<String> pasos, int indiceActual) {
-    final etiquetas = [
-      'Pedido enviado',
-      'Aceptado',
-      'En preparación',
-      'En camino',
-      'Entregado'
-    ];
-    return List.generate(pasos.length, (i) {
-      final completado = i <= indiceActual;
-      final esActual = i == indiceActual;
-      return Row(
-        children: [
-          Column(
-            children: [
-              Container(
-                width: 28, height: 28,
-                decoration: BoxDecoration(
-                    color: completado ? Colors.orange : Colors.grey.shade200,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                        color: esActual ? Colors.deepOrange : Colors.transparent,
-                        width: 2)),
-                child: Icon(
-                    completado ? Icons.check : Icons.circle,
-                    size: 14,
-                    color: completado ? Colors.white : Colors.grey),
-              ),
-              if (i < pasos.length - 1)
-                Container(
-                    width: 2, height: 24,
-                    color: i < indiceActual
-                        ? Colors.orange
-                        : Colors.grey.shade300),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: Text(etiquetas[i],
-                style: TextStyle(
-                    fontWeight:
-                    esActual ? FontWeight.bold : FontWeight.normal,
-                    color: completado ? Colors.black87 : Colors.grey,
-                    fontSize: 15)),
-          ),
-        ],
-      );
-    });
-  }
-
   String _textoEstado(String estado) {
     switch (estado) {
+      case 'buscando': return '🔍 Buscando taquería...';
       case 'pendiente': return '⏳ Esperando confirmación';
       case 'aceptado': return '✅ Pedido aceptado';
       case 'preparacion': return '👨‍🍳 Preparando tu orden';
@@ -168,6 +215,7 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
 
   String _subtextoEstado(String estado) {
     switch (estado) {
+      case 'buscando': return 'Estamos encontrando la taquería más cercana para ti';
       case 'pendiente': return 'La taquería está revisando tu pedido';
       case 'aceptado': return 'Tu pedido fue aceptado, pronto comenzarán';
       case 'preparacion': return 'Están preparando tus tacos con cariño 🌮';
