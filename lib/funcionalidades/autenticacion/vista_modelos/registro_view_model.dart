@@ -34,7 +34,7 @@ class RegistroViewModel extends ChangeNotifier {
   Future<String?> registrarUsuario(
       String nombre,
       String apellidoPat,
-      String apellidoMat, // puede estar vacío
+      String apellidoMat, // opcional
       String correo,
       String contrasena,
       String confirmarContrasena,
@@ -65,7 +65,7 @@ class RegistroViewModel extends ChangeNotifier {
     try {
       final rolAsignado = _esNegocio ? 'negocio' : 'usuario';
 
-      // Construir nombre completo (apellido materno es opcional)
+      // Construir nombre completo
       final partes = [nombre, apellidoPat];
       if (apellidoMat.isNotEmpty) partes.add(apellidoMat);
       final nombreCompleto = partes.join(' ');

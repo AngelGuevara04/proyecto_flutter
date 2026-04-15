@@ -6,14 +6,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class LoginViewModel extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
-  // --- Estados de la Interfaz ---
+  // Estados de la Interfaz
   bool _estaCargando = false;
   bool get estaCargando => _estaCargando;
 
   bool _ocultarContrasena = true;
   bool get ocultarContrasena => _ocultarContrasena;
 
-  // --- Lógica de Seguridad (Bloqueo Progresivo) ---
+  // Logica de Seguridad (Bloqueo Progresivo)
   int _intentosFallidos = 0;
   DateTime? _bloqueadoHasta;
   Timer? _timerConteo;
@@ -72,7 +72,7 @@ class LoginViewModel extends ChangeNotifier {
     } on AuthException catch (error) {
       _intentosFallidos++;
 
-      // 2. APLICAR CASTIGO: Cada 5 intentos fallidos
+      // Aplicar castigo
       if (_intentosFallidos % 5 == 0) {
         // Bloque 1 (intento 5) -> 10 * 2^0 = 10s
         // Bloque 2 (intento 10) -> 10 * 2^1 = 20s

@@ -84,14 +84,14 @@ class SemaforoPrincipal extends StatelessWidget {
         final session = snapshot.data?.session;
         final user = session?.user;
 
-        // ── NO HAY SESIÓN → Login ──
+        // login
         if (session == null || user == null) {
           return ChangeNotifierProvider(
               create: (_) => LoginViewModel(),
               child: const PantallaLogin());
         }
 
-        // ── HAY SESIÓN → Leer metadatos ──
+        // lee metadatos
         final metadatos = user.userMetadata ?? {};
         final rol = metadatos['rol']?.toString() ?? 'usuario';
         final estatusAprobacion =
@@ -99,21 +99,21 @@ class SemaforoPrincipal extends StatelessWidget {
         final perfilCompletado = metadatos['perfil_completado'] == true;
         final suspendido = metadatos['suspendido'] == true;
 
-        // ── CUENTA SUSPENDIDA ──
+        // cuenta suspendida
         if (suspendido) {
           return ChangeNotifierProvider(
               create: (_) => ApelacionViewModel(),
               child: const PantallaCuentaSuspendida());
         }
 
-        // ── ADMINISTRADOR ──
+        // administrador
         if (rol == 'admin') {
           return ChangeNotifierProvider(
               create: (_) => PanelAdminViewModel(),
               child: const PantallaPanelAdmin());
         }
 
-        // ── NEGOCIO ──
+        // negocio
         if (rol == 'negocio') {
           // Aprobado con perfil completo → Panel de negocio
           if (estatusAprobacion == 'aprobado' && perfilCompletado) {
@@ -135,13 +135,13 @@ class SemaforoPrincipal extends StatelessWidget {
           }
 
           // Sin solicitud o rechazado → Subir documentos
-          // Cubre: 'sin_solicitud', 'rechazado', null
+          // Cubre 'sin_solicitud', 'rechazado', null
           return ChangeNotifierProvider(
               create: (_) => SubirDocumentosViewModel(),
               child: const PantallaSubirDocumentos());
         }
 
-        // ── CLIENTE (usuario) ──
+        // cliente o usuario
         return ChangeNotifierProvider(
             create: (_) => InicioClienteViewModel(),
             child: const PantallaInicioCliente());

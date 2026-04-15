@@ -61,10 +61,6 @@ class PantallaInicioNegocio extends StatelessWidget {
     }
   }
 
-  // ══════════════════════════════════════════
-  // TAB INICIO
-  // ══════════════════════════════════════════
-
   Widget _buildTabInicio(
       BuildContext context, InicioNegocioViewModel viewModel) {
     return RefreshIndicator(
@@ -170,9 +166,7 @@ class PantallaInicioNegocio extends StatelessWidget {
     );
   }
 
-  // ══════════════════════════════════════════
-  // TAB PEDIDOS (con sub-tabs Activos | Exprés)
-  // ══════════════════════════════════════════
+  //pedidos
 
   Widget _buildTabPedidos(
       BuildContext context, InicioNegocioViewModel viewModel) {
@@ -658,10 +652,7 @@ class PantallaInicioNegocio extends StatelessWidget {
     return const SizedBox.shrink();
   }
 
-  // ══════════════════════════════════════════
-  // TAB MENÚ (con editar y ver detalles)
-  // ══════════════════════════════════════════
-
+  // menu
   Widget _buildTabMenu(
       BuildContext context, InicioNegocioViewModel viewModel) {
     return Scaffold(
@@ -910,10 +901,7 @@ class PantallaInicioNegocio extends StatelessWidget {
         ));
   }
 
-  // ══════════════════════════════════════════
-  // TAB PERFIL
-  // ══════════════════════════════════════════
-
+  // Perfil
   Widget _buildTabPerfil(
       BuildContext context, InicioNegocioViewModel viewModel) {
     final perfil = viewModel.perfil;

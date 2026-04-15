@@ -19,7 +19,7 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
             () => context.read<PanelAdminViewModel>().cargarDatosTabActual());
   }
 
-  // ── Solicitudes ──
+  // Solicitudes
   void _mostrarDetallesSolicitud(
       PanelAdminViewModel viewModel, dynamic solicitud) {
     showDialog(
@@ -459,7 +459,7 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
     );
   }
 
-  // ── Build principal ──
+  // Build principal
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<PanelAdminViewModel>();
@@ -619,7 +619,7 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
     );
   }
 
-  // ── Reportes: solo muestra al reportado con detalles ──
+  // Reportes pero solo muestra al reportado con detalles
   Widget _buildReportes(PanelAdminViewModel viewModel) {
     if (viewModel.reportes.isEmpty) {
       return const Center(

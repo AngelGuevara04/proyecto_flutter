@@ -178,7 +178,7 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
               ),
             ),
 
-            // ── Confirmar entrega ──
+            // Confirmar entrega
             if (estado == 'reparto')
               ElevatedButton.icon(
                 onPressed: () async {
@@ -199,7 +199,7 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
                 ),
               ),
 
-            // ── Pedido entregado ──
+            // Pedido entregado
             if (estado == 'entregado') ...[
               const Icon(Icons.check_circle,
                   size: 60, color: Colors.green),

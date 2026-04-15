@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../vista_modelos/inicio_negocio_view_model.dart';
 
 class PantallaReportarCliente extends StatefulWidget {
-  // Ahora la pantalla EXIGE que le pasemos el pedido que vamos a reportar
+  // Ahora la pantalla exige que le pasemos el pedido que vamos a reportar
   final Map<String, dynamic> pedidoActivo;
 
   const PantallaReportarCliente({super.key, required this.pedidoActivo});

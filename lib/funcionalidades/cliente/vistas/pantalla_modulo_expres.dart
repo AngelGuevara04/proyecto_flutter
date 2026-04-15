@@ -29,14 +29,13 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
   late TextEditingController _referenciasCtrl;
   late TextEditingController _telefonoCtrl;
 
-  // ── Lista de items del pedido ──
+  // Lista de items del pedido
   final List<Map<String, dynamic>> _items = [];
 
-  // ── Catálogo de tipos ──
+  // Catálogo de tipos
   final List<String> _tiposTaco = [
     'Pastor', 'Bistec', 'Chorizo', 'Suadero', 'Longaniza',
-    'Pollo', 'Carnitas', 'Cabeza', 'Lengua', 'Tripa',
-    'Quesadilla', 'Gringa', 'Torta', 'Otro',
+    'Pollo', 'Carnitas', 'Cabeza', 'Lengua', 'Tripa', 'Gringa', 'Otro',
   ];
 
   final Map<String, double> _preciosEstimados = {
@@ -249,7 +248,7 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Info ──
+            // Info
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -273,7 +272,7 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
             ),
             const SizedBox(height: 16),
 
-            // ── Ubicación ──
+            // Ubicacion
             Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: 12, vertical: 10),
@@ -319,7 +318,7 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
             ),
             const SizedBox(height: 20),
 
-            // ── Tu orden ──
+            //Orden
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -341,7 +340,7 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
             ),
             const SizedBox(height: 8),
 
-            // ── Lista vacía ──
+            // Lista vacía
             if (_items.isEmpty)
               Container(
                 width: double.infinity,
@@ -397,7 +396,7 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
                 );
               }),
 
-            // ── Total estimado ──
+            // Total estimado
             if (_items.isNotEmpty) ...[
               const Divider(),
               Row(

@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class PedidoClienteViewModel extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
-  // ── Carrito ──
+  // Carrito
   final List<Map<String, dynamic>> _carrito = [];
   List<Map<String, dynamic>> get carrito => _carrito;
 
@@ -15,7 +15,7 @@ class PedidoClienteViewModel extends ChangeNotifier {
   int get totalItems =>
       _carrito.fold(0, (suma, item) => suma + (item['cantidad'] as int));
 
-  // ── Estado ──
+  // Estado
   bool _estaCargando = false;
   bool get estaCargando => _estaCargando;
 
@@ -25,7 +25,7 @@ class PedidoClienteViewModel extends ChangeNotifier {
   Map<String, dynamic>? _pedidoActivo;
   Map<String, dynamic>? get pedidoActivo => _pedidoActivo;
 
-  // ── Carrito ──
+  // Carrito
   void agregarAlCarrito(Map<String, dynamic> producto) {
     final index = _carrito.indexWhere((p) => p['id'] == producto['id']);
     if (index >= 0) {
@@ -61,7 +61,7 @@ class PedidoClienteViewModel extends ChangeNotifier {
     return item['cantidad'] as int;
   }
 
-  // ── Crear pedido Modo Libre ──
+  // Crear pedido Modo Libre
   Future<String?> crearPedidoLibre({
     required String negocioId,
     required String nombreCliente,
@@ -119,7 +119,7 @@ class PedidoClienteViewModel extends ChangeNotifier {
     }
   }
 
-  // ── Rastrear pedido activo en tiempo real ──
+  // Rastrear pedido activo en tiempo real
   RealtimeChannel? _canal;
 
   void escucharPedido(String pedidoId) {
@@ -169,7 +169,7 @@ class PedidoClienteViewModel extends ChangeNotifier {
     }
   }
 
-  // ── Cancelar pedido ──
+  // Cancelar pedido
   Future<String?> cancelarPedido(String pedidoId) async {
     try {
       await _supabase

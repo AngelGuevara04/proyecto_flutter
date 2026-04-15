@@ -4,14 +4,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class PanelAdminViewModel extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
-
-  // 1. BANDERA DE SEGURIDAD (Evita el error 'Used after being disposed')
   bool _isDisposed = false;
 
   int _indiceTab = 0;
   int get indiceTab => _indiceTab;
 
-  // Estado del sub-menú de apelaciones (0: Pendientes, 1: Historial)
+  // Estado del sub-menú de apelaciones
   int _indiceSubTabApelacion = 0;
   int get indiceSubTabApelacion => _indiceSubTabApelacion;
 
@@ -25,7 +23,7 @@ class PanelAdminViewModel extends ChangeNotifier {
   List<Map<String, dynamic>> _reportes = [];
   List<Map<String, dynamic>> get reportes => _reportes;
 
-  // APELACIONES FILTRADAS
+  // Apelaciones filtradas
   List<dynamic> _apelaciones = [];
   List<dynamic> get apelacionesPendientes => _apelaciones.where((a) => a['estatus'] == 'pendiente').toList();
   List<dynamic> get apelacionesHistorico => _apelaciones.where((a) => a['estatus'] != 'pendiente').toList();
@@ -33,12 +31,12 @@ class PanelAdminViewModel extends ChangeNotifier {
   bool _estaCargando = false;
   bool get estaCargando => _estaCargando;
 
-  // 2. CONSTRUCTOR: Faltaba esto para que cargue los datos apenas se abre la pantalla
+  // cargar los datos al momento de abrir las ventanas
   PanelAdminViewModel() {
     cargarDatosTabActual();
   }
 
-  // 3. FUNCIÓN DE NOTIFICACIÓN SEGURA
+  // funcion de notificacion
   void _notificar() {
     if (!_isDisposed) notifyListeners();
   }
@@ -140,7 +138,7 @@ class PanelAdminViewModel extends ChangeNotifier {
     }
   }
 
-  // 4. LIMPIEZA AL CERRAR PANTALLA
+  // limpia la pantalla al momento de cerrarla
   @override
   void dispose() {
     _isDisposed = true;

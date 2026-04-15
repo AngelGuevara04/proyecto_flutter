@@ -54,7 +54,7 @@ class _ContenidoState extends State<_Contenido> {
     }
   }
 
-  // ── Calcular costo de envío según configuración ──
+  // Calcular costo de envío según configuracion
   double _calcularCostoEnvio(double totalProductos) {
     final tipo = widget.taqueria['tipo_envio'] ?? 'gratis';
     final costo = (widget.taqueria['costo_envio'] ?? 0).toDouble();
@@ -243,7 +243,7 @@ class _ContenidoState extends State<_Contenido> {
                   ),
                 ),
 
-              // ── Botón principal ──
+              // Botón principal
               ElevatedButton(
                 onPressed: () => Navigator.push(
                     context,

@@ -119,16 +119,13 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
-  // ══════════════════════════════════════════
-  // LÓGICA DE TIEMPO REAL
-  // ══════════════════════════════════════════
+  // Logica a tiempo real
 
   void _inicializarTiempoReal(String uid) {
     if (_canalMisPedidos != null) _supabase.removeChannel(_canalMisPedidos!);
     if (_canalExpres != null) _supabase.removeChannel(_canalExpres!);
 
-    // Canal 1: Sin filtro de Supabase — filtramos manualmente por negocio_id
-    // Razón: el filtro por UUID en Realtime falla silenciosamente
+    // Canal 1 Sin filtro de Supabase ya que filtramos manualmente por negocio_id
     _canalMisPedidos = _supabase
         .channel('mis_pedidos_negocio_$uid')
         .onPostgresChanges(
@@ -153,7 +150,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     )
         .subscribe();
 
-    // Canal 2: Escucha pedidos exprés globales
+    // Canal 2 Escucha pedidos exprés globales
     _canalExpres = _supabase
         .channel('pedidos_expres_global_$uid')
         .onPostgresChanges(
@@ -176,19 +173,19 @@ class InicioNegocioViewModel extends ChangeNotifier {
         debugPrint(
             'Tiempo real exprés: $viejoEstado → $nuevoEstado | negocio: $nuevoNegocioId');
 
-        // ── Caso 1: Nuevo pedido exprés disponible ──
+        // Caso 1 Nuevo pedido exprés disponible
         if (nuevoEstado == 'buscando') {
           debugPrint('Nuevo pedido exprés disponible');
           cargarPedidosExpresDisponibles();
         }
 
-        // ── Caso 2: Pedido exprés ya no está disponible ──
-        // Cubre: reclamado, cancelado, o cualquier cambio desde buscando
+        // Caso 2 Pedido exprés ya no está disponible
+        // abarca reclamado, cancelado, o cualquier cambio desde buscando
         if (viejoEstado == 'buscando' && nuevoEstado != 'buscando') {
           debugPrint('Pedido exprés removido: $nuevoEstado');
           cargarPedidosExpresDisponibles();
 
-          // Si LO RECLAMÓ ESTA taquería → actualizar pedidos activos
+          // si lo reclamo esta taquería → actualizar pedidos activos
           if (nuevoEstado == 'pendiente' && nuevoNegocioId == uid) {
             debugPrint(
                 'Esta taquería reclamó el pedido → actualizando activos');
@@ -209,9 +206,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     if (_indiceSubTabPedidos == 1) await cargarPedidosExpresDisponibles();
   }
 
-  // ══════════════════════════════════════════
-  // PEDIDOS ACTIVOS E HISTORIAL
-  // ══════════════════════════════════════════
+  // Pedidos actuales
 
   Future<void> cargarPedidosActivos() async {
     try {
@@ -252,7 +247,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
-  // ── CORRECCIÓN: recarga manual inmediata + canal como respaldo ──
+  // recarga manual inmediata + canal como respaldo
   Future<void> actualizarEstadoPedido(
       String idPedido, String nuevoEstado) async {
     try {
@@ -286,9 +281,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
-  // ══════════════════════════════════════════
-  // MODO EXPRÉS — LADO TAQUERÍA
-  // ══════════════════════════════════════════
+  // Modo expres del panel de taqueria
 
   Future<void> cargarPedidosExpresDisponibles() async {
     try {
@@ -385,10 +378,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
 
   double _toRad(double deg) => deg * pi / 180;
 
-  // ══════════════════════════════════════════
-  // ESTADÍSTICAS DEL DÍA
-  // ══════════════════════════════════════════
-
+  // Estadisticas del dia
   Future<void> cargarEstadisticasHoy() async {
     try {
       final uid = _supabase.auth.currentUser!.id;
@@ -437,10 +427,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
-  // ══════════════════════════════════════════
-  // PRODUCTOS Y PERFIL
-  // ══════════════════════════════════════════
-
+  // Productos y perfil
   Future<void> cargarProductos() async {
     try {
       final uid = _supabase.auth.currentUser!.id;

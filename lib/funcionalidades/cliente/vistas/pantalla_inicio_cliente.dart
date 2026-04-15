@@ -202,7 +202,7 @@ class PantallaInicioCliente extends StatelessWidget {
     );
   }
 
-  // ── Helper: calcular texto de envío ──
+  // calcular texto de envío
   String _textoEnvio(Map<String, dynamic> taqueria) {
     final tipo = taqueria['tipo_envio'] ?? 'gratis';
     final costo = (taqueria['costo_envio'] ?? 0).toDouble();

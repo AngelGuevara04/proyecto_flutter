@@ -133,7 +133,7 @@ class _PantallaEditarPerfilNegocioState extends State<PantallaEditarPerfilNegoci
             ),
             const SizedBox(height: 30),
 
-            // --- CONFIGURACIÓN DE ENVÍO ---
+            // configuracion de envio
             const Text('Configuración de Envío', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
@@ -164,7 +164,7 @@ class _PantallaEditarPerfilNegocioState extends State<PantallaEditarPerfilNegoci
             ],
             const SizedBox(height: 30),
 
-            // --- GALERÍA ---
+            // galeria
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

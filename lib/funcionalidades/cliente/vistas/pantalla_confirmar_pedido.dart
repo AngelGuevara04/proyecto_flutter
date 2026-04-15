@@ -38,7 +38,7 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
     super.dispose();
   }
 
-  // ── Calcular costo de envío ──
+  // Calcular costo de envío
   double _calcularCostoEnvio(double totalProductos) {
     final tipo = widget.taqueria['tipo_envio'] ?? 'gratis';
     final costo = (widget.taqueria['costo_envio'] ?? 0).toDouble();
@@ -86,7 +86,7 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Resumen del carrito ──
+            // Resumen del carrito
             const Text('Tu pedido',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -106,7 +106,7 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
             )),
             const Divider(),
 
-            // ── Desglose de costos ──
+            // Desglose de costos
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [

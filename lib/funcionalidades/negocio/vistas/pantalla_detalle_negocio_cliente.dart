@@ -16,7 +16,7 @@ class PantallaDetalleNegocioCliente extends StatelessWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator(color: Colors.orange)));
     }
 
-    // --- LÓGICA DINÁMICA DE ENVÍO CORREGIDA ---
+    // Logica del envio
     String textoEnvio = "Envío Gratis";
     Color colorEnvio = Colors.green;
     IconData iconoEnvio = Icons.pedal_bike;
@@ -30,20 +30,19 @@ class PantallaDetalleNegocioCliente extends StatelessWidget {
       colorEnvio = Colors.blue;
       iconoEnvio = Icons.delivery_dining;
     } else if (tipoEnvio == 'umbral') {
-      // AQUÍ ESTÁ LA MAGIA: Usamos \n para poner dos líneas en la etiqueta
       textoEnvio = "Envío \$${costoEnvio.toStringAsFixed(0)}\nGratis > \$${gratisDesde.toStringAsFixed(0)}";
       colorEnvio = Colors.deepPurple;
       iconoEnvio = Icons.card_giftcard;
     }
 
-    // --- LÓGICA DE ESTRELLAS ---
+    // logica de estrellas o calficacion de negocio
     final estrellasStr = (perfil['estrellas'] ?? 5.0).toString();
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
-          // 1. CABECERA CON CARRUSEL DE FOTOS
+          // cabecera
           SliverAppBar(
             expandedHeight: 250.0,
             pinned: true,
@@ -83,7 +82,7 @@ class PantallaDetalleNegocioCliente extends StatelessWidget {
             ),
           ),
 
-          // 2. INFORMACIÓN GENERAL Y BADGES
+          // informacion general
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -115,7 +114,7 @@ class PantallaDetalleNegocioCliente extends StatelessWidget {
             ),
           ),
 
-          // 3. LISTA DE PRODUCTOS
+          // Lista de productos
           productos.isEmpty
               ? const SliverToBoxAdapter(
             child: Center(
@@ -147,7 +146,7 @@ class PantallaDetalleNegocioCliente extends StatelessWidget {
     );
   }
 
-  // --- WIDGETS DE APOYO (UI) ---
+  //widgets de apoyo
 
   Widget _badgeInfo(IconData icono, String texto, Color color) {
     return Container(
