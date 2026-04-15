@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../vista_modelos/panel_admin_view_model.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../vista_modelos/panel_admin_view_model.dart';
 
 class PantallaPanelAdmin extends StatefulWidget {
   const PantallaPanelAdmin({super.key});
@@ -15,14 +15,14 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
   @override
   void initState() {
     super.initState();
+    // Cargamos los datos apenas se inicializa la pantalla
     Future.microtask(() => context.read<PanelAdminViewModel>().cargarDatosTabActual());
   }
 
   // ----------------------------------------------------------------------
-  // DIÁLOGOS DE INTERACCIÓN (NUEVOS Y ACTUALIZADOS)
+  // DIÁLOGOS DE INTERACCIÓN
   // ----------------------------------------------------------------------
 
-  // NUEVO: EXPEDIENTE COMPLETO DE LA SOLICITUD
   void _mostrarDetallesSolicitud(PanelAdminViewModel viewModel, dynamic solicitud) {
     showDialog(
       context: context,
@@ -31,7 +31,12 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
           children: [
             const Icon(Icons.store, color: Colors.orange),
             const SizedBox(width: 8),
-            Expanded(child: Text(solicitud['nombre_comercial'] ?? 'Sin nombre', style: const TextStyle(fontSize: 20))),
+            Expanded(
+              child: Text(
+                  solicitud['nombre_comercial'] ?? 'Sin nombre',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -40,47 +45,33 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Divider(),
-              Text('Propietario: ${solicitud['propietario'] ?? 'N/A'}', style: const TextStyle(fontSize: 16)),
+              Text('Propietario: ${solicitud['propietario'] ?? 'N/A'}', style: const TextStyle(fontSize: 15)),
               const SizedBox(height: 8),
               Text('RFC: ${solicitud['rfc'] ?? 'N/A'}', style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               const Text('Dirección:', style: TextStyle(color: Colors.grey)),
-              Text(solicitud['direccion'] ?? 'N/A', style: const TextStyle(fontSize: 16)),
+              Text(solicitud['direccion'] ?? 'N/A', style: const TextStyle(fontSize: 15)),
               const SizedBox(height: 24),
 
               const Text('Documentos Adjuntos:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 8),
 
-              // CONEXIÓN AL NAVEGADOR
+              // CONEXIÓN AL NAVEGADOR PARA PDFs / IMÁGENES
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                title: const Text('Identificación Oficial'),
-                subtitle: const Text('Toca para abrir documento'),
+                title: const Text('Identificación Oficial', style: TextStyle(fontSize: 14)),
+                subtitle: const Text('Toca para abrir', style: TextStyle(fontSize: 12)),
                 trailing: const Icon(Icons.open_in_browser, color: Colors.blue),
-                onTap: () async {
-                  final url = solicitud['url_identificacion'];
-                  if (url != null && url.startsWith('http')) {
-                    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay archivo válido')));
-                  }
-                },
+                onTap: () => _abrirEnNavegador(solicitud['url_identificacion']),
               ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                title: const Text('Comprobante de Domicilio'),
-                subtitle: const Text('Toca para abrir documento'),
+                title: const Text('Comprobante de Domicilio', style: TextStyle(fontSize: 14)),
+                subtitle: const Text('Toca para abrir', style: TextStyle(fontSize: 12)),
                 trailing: const Icon(Icons.open_in_browser, color: Colors.blue),
-                onTap: () async {
-                  final url = solicitud['url_comprobante_domicilio'];
-                  if (url != null && url.startsWith('http')) {
-                    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay archivo válido')));
-                  }
-                },
+                onTap: () => _abrirEnNavegador(solicitud['url_comprobante_domicilio']),
               ),
             ],
           ),
@@ -97,7 +88,7 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
                   Navigator.pop(ctx);
                   _mostrarDialogoRechazoSolicitud(viewModel, solicitud);
                 },
-                icon: const Icon(Icons.close),
+                icon: const Icon(Icons.close, size: 16),
                 label: const Text('Rechazar'),
               ),
               const SizedBox(width: 8),
@@ -107,7 +98,7 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
                   Navigator.pop(ctx);
                   await viewModel.gestionarSolicitud(solicitud['id'].toString(), solicitud['usuario_id'], 'aprobado');
                 },
-                icon: const Icon(Icons.check),
+                icon: const Icon(Icons.check, size: 16),
                 label: const Text('Aprobar'),
               ),
             ],
@@ -116,7 +107,21 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
       ),
     );
   }
-  // NUEVO: EXPEDIENTE BÁSICO DEL USUARIO/NEGOCIO (Directorio)
+
+  // Método seguro para abrir URLs
+  Future<void> _abrirEnNavegador(String? url) async {
+    if (url != null && url.startsWith('http')) {
+      try {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No se pudo abrir el enlace.')));
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No hay archivo válido')));
+    }
+  }
+
   void _mostrarDetallesUsuario(dynamic usuario) {
     showDialog(
       context: context,
@@ -158,7 +163,10 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
             TextField(
               controller: controlMotivo,
               maxLines: 3,
-              decoration: const InputDecoration(border: OutlineInputBorder(), hintText: 'Ej. Tu RFC no coincide o la foto es borrosa...'),
+              decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Ej. Tu RFC no coincide o la foto es borrosa...'
+              ),
             ),
           ],
         ),
@@ -170,7 +178,9 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
               if (controlMotivo.text.trim().isEmpty) return;
               Navigator.pop(ctx);
               final error = await viewModel.gestionarSolicitud(solicitud['id'].toString(), solicitud['usuario_id'], 'rechazado', controlMotivo.text);
-              if (mounted && error != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+              if (mounted && error != null) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+              }
             },
             child: const Text('Confirmar Rechazo'),
           ),
@@ -231,18 +241,30 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Panel de Administración'),
+        title: const Text('Panel de Administración', style: TextStyle(fontSize: 18)),
         backgroundColor: Colors.blueGrey[900],
         foregroundColor: Colors.white,
-        actions: [IconButton(icon: const Icon(Icons.logout), onPressed: () => Supabase.instance.client.auth.signOut())],
+        actions: [
+          IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () => Supabase.instance.client.auth.signOut()
+          )
+        ],
       ),
       body: viewModel.estaCargando
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(onRefresh: () => viewModel.cargarDatosTabActual(), child: _construirCuerpo(viewModel)),
+          ? const Center(child: CircularProgressIndicator(color: Colors.blueGrey))
+          : RefreshIndicator(
+          onRefresh: () => viewModel.cargarDatosTabActual(),
+          child: _construirCuerpo(viewModel)
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: viewModel.indiceTab,
         onTap: viewModel.cambiarTab,
-        selectedItemColor: Colors.orange, unselectedItemColor: Colors.grey, type: BottomNavigationBarType.fixed, selectedFontSize: 12, unselectedFontSize: 10,
+        selectedItemColor: Colors.orange,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        selectedFontSize: 11,
+        unselectedFontSize: 10,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.approval), label: 'Nuevos'),
           BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Usuarios'),
@@ -269,9 +291,10 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
   // CONSTRUCCIÓN DE LAS LISTAS
   // ----------------------------------------------------------------------
 
-  // ACTUALIZADO: Las solicitudes ahora son tarjetas cliqueables
   Widget _buildSolicitudes(PanelAdminViewModel viewModel) {
-    if (viewModel.solicitudesPendientes.isEmpty) return const Center(child: Text('No hay solicitudes pendientes'));
+    if (viewModel.solicitudesPendientes.isEmpty) {
+      return const Center(child: Text('No hay solicitudes pendientes', style: TextStyle(color: Colors.grey)));
+    }
     return ListView.builder(
       itemCount: viewModel.solicitudesPendientes.length,
       itemBuilder: (context, i) {
@@ -285,7 +308,6 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
             subtitle: Text('Toca para ver el expediente\nRFC: ${sol['rfc'] ?? 'N/A'}'),
             isThreeLine: true,
             trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 16),
-            // Al tocar la tarjeta, se abre el expediente completo
             onTap: () => _mostrarDetallesSolicitud(viewModel, sol),
           ),
         );
@@ -293,9 +315,10 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
     );
   }
 
-  // ACTUALIZADO: El directorio ahora abre el perfil del usuario al tocarlo
   Widget _buildDirectorio(PanelAdminViewModel viewModel, List<dynamic> lista, IconData icono) {
-    if (lista.isEmpty) return const Center(child: Text('No hay registros'));
+    if (lista.isEmpty) {
+      return const Center(child: Text('No hay registros', style: TextStyle(color: Colors.grey)));
+    }
     return ListView.builder(
       padding: const EdgeInsets.all(8),
       itemCount: lista.length,
@@ -304,14 +327,35 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
         final bool estaSuspendido = item['suspendido'] == true;
         final int reportes = item['total_reportes'] ?? 0;
         final bool enPeligro = reportes >= 15;
+
         return Card(
           color: estaSuspendido ? Colors.grey[300] : (enPeligro ? Colors.red[50] : Colors.white),
           child: ListTile(
-            leading: CircleAvatar(backgroundColor: estaSuspendido ? Colors.grey : (enPeligro ? Colors.red : Colors.blueGrey), child: Icon(icono, color: Colors.white)),
-            title: Text(item['nombre'], style: TextStyle(decoration: estaSuspendido ? TextDecoration.lineThrough : null, fontWeight: FontWeight.bold)),
-            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item['email']), if (reportes > 0) Text('🚨 Reportes: $reportes', style: TextStyle(color: enPeligro ? Colors.red : Colors.orange, fontWeight: FontWeight.bold))]),
-            trailing: estaSuspendido ? const Text('BANEADO', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)) : IconButton(icon: const Icon(Icons.block, color: Colors.red), onPressed: () => _confirmarSuspension(viewModel, item)),
-            // Al tocar, muestra detalles del usuario
+            leading: CircleAvatar(
+                backgroundColor: estaSuspendido ? Colors.grey : (enPeligro ? Colors.red : Colors.blueGrey),
+                child: Icon(icono, color: Colors.white)
+            ),
+            title: Text(
+                item['nombre'] ?? 'Desconocido',
+                style: TextStyle(
+                    decoration: estaSuspendido ? TextDecoration.lineThrough : null,
+                    fontWeight: FontWeight.bold
+                )
+            ),
+            subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item['email'] ?? ''),
+                  if (reportes > 0)
+                    Text('🚨 Reportes: $reportes', style: TextStyle(color: enPeligro ? Colors.red : Colors.orange, fontWeight: FontWeight.bold))
+                ]
+            ),
+            trailing: estaSuspendido
+                ? const Text('BANEADO', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
+                : IconButton(
+                icon: const Icon(Icons.block, color: Colors.red),
+                onPressed: () => _confirmarSuspension(viewModel, item)
+            ),
             onTap: () => _mostrarDetallesUsuario(item),
           ),
         );
@@ -320,7 +364,9 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
   }
 
   Widget _buildReportes(PanelAdminViewModel viewModel) {
-    if (viewModel.reportes.isEmpty) return const Center(child: Text('Cero reportes. Todo tranquilo.'));
+    if (viewModel.reportes.isEmpty) {
+      return const Center(child: Text('Cero reportes. Todo tranquilo.', style: TextStyle(color: Colors.grey)));
+    }
     return ListView.builder(
       itemCount: viewModel.reportes.length,
       itemBuilder: (context, i) {
@@ -332,10 +378,16 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(children: [const Icon(Icons.warning, color: Colors.amber), const SizedBox(width: 8), Expanded(child: Text('Motivo: ${rep['motivo']}', style: const TextStyle(fontWeight: FontWeight.bold)))]),
+                Row(
+                    children: [
+                      const Icon(Icons.warning, color: Colors.amber),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('Motivo: ${rep['motivo'] ?? 'N/A'}', style: const TextStyle(fontWeight: FontWeight.bold)))
+                    ]
+                ),
                 const Divider(),
-                Text('Reportador: ${rep['reportador_email'] ?? 'Desconocido'}'),
-                Text('Reportado: ${rep['reportado_email'] ?? 'Desconocido'}', style: const TextStyle(color: Colors.red)),
+                Text('Negocio ID: ${rep['negocio_id'] ?? 'Desconocido'}'),
+                Text('Cliente involucrado: ${rep['cliente_email'] ?? 'Desconocido'}', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -367,13 +419,15 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
     final lista = viewModel.indiceSubTabApelacion == 0 ? viewModel.apelacionesPendientes : viewModel.apelacionesHistorico;
     final esHistorial = viewModel.indiceSubTabApelacion == 1;
 
-    if (lista.isEmpty) return Center(child: Text(esHistorial ? 'No hay historial' : 'No hay apelaciones por revisar'));
+    if (lista.isEmpty) {
+      return Center(child: Text(esHistorial ? 'No hay historial' : 'No hay apelaciones por revisar', style: const TextStyle(color: Colors.grey)));
+    }
 
     return ListView.builder(
       itemCount: lista.length,
       itemBuilder: (context, i) {
         final ap = lista[i];
-        final estatus = ap['estatus'];
+        final estatus = ap['estatus'] ?? 'desconocido';
 
         return Card(
           margin: const EdgeInsets.all(8),
@@ -388,7 +442,7 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
                   children: [
                     Icon(esHistorial ? Icons.lock : Icons.mark_email_read, color: esHistorial ? Colors.grey : Colors.blue),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('De: ${ap['nombre']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                    Expanded(child: Text('De: ${ap['nombre'] ?? 'Usuario'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
                     if (esHistorial)
                       Chip(
                         label: Text(estatus.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10)),
@@ -396,11 +450,11 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
                       )
                   ],
                 ),
-                Text(ap['email'], style: const TextStyle(color: Colors.grey)),
+                Text(ap['email'] ?? 'Sin email', style: const TextStyle(color: Colors.grey)),
                 const Divider(),
                 const Text('Justificación:', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 4),
-                Text(ap['motivo'], style: const TextStyle(fontStyle: FontStyle.italic)),
+                Text(ap['motivo'] ?? 'Sin justificación', style: const TextStyle(fontStyle: FontStyle.italic)),
 
                 if (!esHistorial) ...[
                   const SizedBox(height: 12),
@@ -410,12 +464,12 @@ class _PantallaPanelAdminState extends State<PantallaPanelAdmin> {
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                         onPressed: () => _confirmarResolucionApelacion(viewModel, ap, true),
-                        icon: const Icon(Icons.check_circle), label: const Text('Perdonar'),
+                        icon: const Icon(Icons.check_circle, size: 16), label: const Text('Perdonar'),
                       ),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
                         onPressed: () => _confirmarResolucionApelacion(viewModel, ap, false),
-                        icon: const Icon(Icons.cancel), label: const Text('Rechazar'),
+                        icon: const Icon(Icons.cancel, size: 16), label: const Text('Rechazar'),
                       ),
                     ],
                   ),

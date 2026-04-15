@@ -5,6 +5,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class PanelAdminViewModel extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
+  // 1. BANDERA DE SEGURIDAD (Evita el error 'Used after being disposed')
+  bool _isDisposed = false;
+
   int _indiceTab = 0;
   int get indiceTab => _indiceTab;
 
@@ -30,67 +33,82 @@ class PanelAdminViewModel extends ChangeNotifier {
   bool _estaCargando = false;
   bool get estaCargando => _estaCargando;
 
+  // 2. CONSTRUCTOR: Faltaba esto para que cargue los datos apenas se abre la pantalla
+  PanelAdminViewModel() {
+    cargarDatosTabActual();
+  }
+
+  // 3. FUNCIÓN DE NOTIFICACIÓN SEGURA
+  void _notificar() {
+    if (!_isDisposed) notifyListeners();
+  }
+
   void cambiarTab(int indice) {
     _indiceTab = indice;
     cargarDatosTabActual();
-    notifyListeners();
+    _notificar();
   }
 
   void cambiarSubTabApelacion(int indice) {
     _indiceSubTabApelacion = indice;
-    notifyListeners();
+    _notificar();
   }
 
   Future<void> cargarDatosTabActual() async {
     _estaCargando = true;
-    notifyListeners();
+    _notificar();
 
     try {
       if (_indiceTab == 0) {
         final datos = await _supabase.from('solicitudes_registro').select().eq('estatus', 'pendiente');
+        if (_isDisposed) return;
         _solicitudesPendientes = List<Map<String, dynamic>>.from(datos);
       }
       else if (_indiceTab == 1 || _indiceTab == 2) {
         final respuestaRpc = await _supabase.rpc('admin_obtener_usuarios');
-        _todosLosUsuarios = List<dynamic>.from(respuestaRpc);
+        if (_isDisposed) return;
+        if (respuestaRpc != null) {
+          _todosLosUsuarios = List<dynamic>.from(respuestaRpc);
+        } else {
+          _todosLosUsuarios = [];
+        }
       }
       else if (_indiceTab == 3) {
         final respuestaRpc = await _supabase.rpc('admin_obtener_reportes');
+        if (_isDisposed) return;
         if (respuestaRpc != null) {
           _reportes = List<Map<String, dynamic>>.from(respuestaRpc is String ? jsonDecode(respuestaRpc) : respuestaRpc);
         } else { _reportes = []; }
       }
       else if (_indiceTab == 4) {
         final respuestaRpc = await _supabase.rpc('admin_obtener_apelaciones');
+        if (_isDisposed) return;
         if (respuestaRpc != null) {
           _apelaciones = List<dynamic>.from(respuestaRpc is String ? jsonDecode(respuestaRpc) : respuestaRpc);
         } else { _apelaciones = []; }
       }
     } catch (e) {
-      debugPrint('🚨 ERROR EN ADMIN: $e');
+      debugPrint('🚨 ERROR EN ADMIN CARGANDO TAB $_indiceTab: $e');
     } finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
-  // AHORA RECIBE EL MOTIVO Y CAMBIA EL ESTATUS DEL USUARIO
   Future<String?> gestionarSolicitud(String idSolicitud, String usuarioId, String nuevoEstatus, [String motivo = '']) async {
     try {
-      // 1. Actualizamos la solicitud en la tabla
       await _supabase.from('solicitudes_registro').update({
         'estatus': nuevoEstatus,
         'motivo_rechazo': motivo.isEmpty ? null : motivo
       }).eq('id', idSolicitud);
 
-      // 2. Disparamos el RPC para cambiar el metadato del usuario (para el Semáforo)
       await _supabase.rpc('admin_actualizar_estatus_negocio', params: {
         'uid': usuarioId,
         'nuevo_estatus': nuevoEstatus
       });
 
       _solicitudesPendientes.removeWhere((s) => s['id'] == idSolicitud);
-      notifyListeners();
+      _notificar();
       return null;
     } catch (e) {
       return 'Error al procesar: $e';
@@ -120,5 +138,12 @@ class PanelAdminViewModel extends ChangeNotifier {
     } catch (e) {
       return 'Error al procesar: $e';
     }
+  }
+
+  // 4. LIMPIEZA AL CERRAR PANTALLA
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
   }
 }
