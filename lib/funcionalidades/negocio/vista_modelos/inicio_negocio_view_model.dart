@@ -127,7 +127,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     if (_canalMisPedidos != null) _supabase.removeChannel(_canalMisPedidos!);
     if (_canalExpres != null) _supabase.removeChannel(_canalExpres!);
 
-    // Canal 1: Escucha cambios en los pedidos ya asignados a esta taquería
+    // Canal 1: Escucha cambios en pedidos ya asignados a esta taquería
     _canalMisPedidos = _supabase
         .channel('mis_pedidos_negocio_$uid')
         .onPostgresChanges(
@@ -172,20 +172,20 @@ class InicioNegocioViewModel extends ChangeNotifier {
         debugPrint(
             'Tiempo real exprés: $viejoEstado → $nuevoEstado | negocio: $nuevoNegocioId');
 
-        // ── Caso 1: Se acaba de crear un pedido exprés nuevo ──
+        // ── Caso 1: Nuevo pedido exprés disponible ──
         if (nuevoEstado == 'buscando') {
           debugPrint('Nuevo pedido exprés disponible');
           cargarPedidosExpresDisponibles();
         }
 
-        // ── Caso 2: Un pedido exprés fue reclamado por alguien ──
-        if (viejoEstado == 'buscando' && nuevoEstado == 'pendiente') {
-          debugPrint('Pedido exprés reclamado');
-          // Siempre actualizar la lista de disponibles
+        // ── Caso 2: Pedido exprés ya no está disponible ──
+        // Cubre: reclamado por alguien, cancelado, o cualquier cambio
+        if (viejoEstado == 'buscando' && nuevoEstado != 'buscando') {
+          debugPrint('Pedido exprés removido: $nuevoEstado');
           cargarPedidosExpresDisponibles();
 
-          // Si LO RECLAMÓ ESTA TAQUERÍA → actualizar pedidos activos
-          if (nuevoNegocioId == uid) {
+          // Si LO RECLAMÓ ESTA taquería → actualizar pedidos activos
+          if (nuevoEstado == 'pendiente' && nuevoNegocioId == uid) {
             debugPrint(
                 'Esta taquería reclamó el pedido → actualizando activos');
             cargarPedidosActivos();
@@ -262,7 +262,6 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .update(datosActualizar)
           .eq('id', idPedido);
       // El canal _canalMisPedidos detectará el cambio automáticamente
-      // y llamará cargarPedidosActivos() por tiempo real
     } catch (e) {
       debugPrint('Error actualizando pedido: $e');
     } finally {
@@ -326,7 +325,6 @@ class InicioNegocioViewModel extends ChangeNotifier {
 
       final uid = _supabase.auth.currentUser!.id;
 
-      // Verificar que nadie más lo haya tomado
       final actual = await _supabase
           .from('pedidos')
           .select('estado')
@@ -337,14 +335,12 @@ class InicioNegocioViewModel extends ChangeNotifier {
         return 'Este pedido ya fue tomado por otra taquería ⚡';
       }
 
-      // Reclamar el pedido
       await _supabase.from('pedidos').update({
         'negocio_id': uid,
         'estado': 'pendiente',
       }).eq('id', pedidoId);
 
-      // El canal _canalExpres detectará el cambio y actualizará
-      // automáticamente tanto la lista exprés como los pedidos activos
+      // El canal _canalExpres detectará el cambio automáticamente
       return null;
     } catch (e) {
       return 'Error al reclamar el pedido: $e';
