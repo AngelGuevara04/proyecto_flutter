@@ -8,10 +8,12 @@ import 'package:file_picker/file_picker.dart';
 class InicioNegocioViewModel extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
+  // ── Bandera de seguridad para evitar errores al destruir la pantalla ──
+  bool _isDisposed = false;
+
   int _indiceTab = 0;
   int get indiceTab => _indiceTab;
 
-  // Sub-tab de pedidos: 0 = Activos, 1 = Exprés disponibles
   int _indiceSubTabPedidos = 0;
   int get indiceSubTabPedidos => _indiceSubTabPedidos;
 
@@ -54,7 +56,6 @@ class InicioNegocioViewModel extends ChangeNotifier {
     return lista.map((e) => e.toString()).toList();
   }
 
-  // ── Canales de Tiempo Real ──
   RealtimeChannel? _canalMisPedidos;
   RealtimeChannel? _canalExpres;
 
@@ -62,20 +63,27 @@ class InicioNegocioViewModel extends ChangeNotifier {
     cargarDatosPerfil();
   }
 
+  // ── FUNCIÓN SEGURA PARA NOTIFICAR (Evita el error 'Used after disposed') ──
+  void _notificar() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
   void cambiarTab(int indice) {
     _indiceTab = indice;
-    notifyListeners();
+    _notificar();
   }
 
   void cambiarSubTabPedidos(int indice) {
     _indiceSubTabPedidos = indice;
     if (indice == 1) cargarPedidosExpresDisponibles();
-    notifyListeners();
+    _notificar();
   }
 
   Future<void> cargarDatosPerfil() async {
     _estaCargando = true;
-    notifyListeners();
+    _notificar();
     try {
       final uid = _supabase.auth.currentUser!.id;
 
@@ -106,14 +114,13 @@ class InicioNegocioViewModel extends ChangeNotifier {
       await cargarPedidosActivos();
       await cargarHistorial();
 
-      // Inicializamos los listeners en tiempo real para las tablas
       _inicializarTiempoReal(uid);
 
     } catch (e) {
       debugPrint('Error crítico cargando perfil: $e');
     } finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
@@ -122,11 +129,9 @@ class InicioNegocioViewModel extends ChangeNotifier {
   // ══════════════════════════════════════════
 
   void _inicializarTiempoReal(String uid) {
-    // Limpiar canales anteriores si existen para no duplicar eventos
     if (_canalMisPedidos != null) _supabase.removeChannel(_canalMisPedidos!);
     if (_canalExpres != null) _supabase.removeChannel(_canalExpres!);
 
-    // 1. Escuchar los pedidos asignados a esta taquería (nuevos o actualizaciones)
     _canalMisPedidos = _supabase
         .channel('mis_pedidos_negocio_$uid')
         .onPostgresChanges(
@@ -139,13 +144,15 @@ class InicioNegocioViewModel extends ChangeNotifier {
         value: uid,
       ),
       callback: (payload) {
+        // Detenemos la ejecución si la pantalla ya se cerró
+        if (_isDisposed) return;
+
         debugPrint('Actualización en tiempo real: Mis Pedidos');
         cargarPedidosActivos();
         cargarEstadisticasHoy();
       },
     ).subscribe();
 
-    // 2. Escuchar la red global de pedidos exprés
     _canalExpres = _supabase
         .channel('pedidos_expres_global_$uid')
         .onPostgresChanges(
@@ -158,7 +165,8 @@ class InicioNegocioViewModel extends ChangeNotifier {
         value: 'expres',
       ),
       callback: (payload) {
-        // Solo actualizar si el estado involucra "buscando"
+        if (_isDisposed) return;
+
         final nuevoEstado = payload.newRecord['estado'];
         final viejoEstado = payload.oldRecord['estado'];
 
@@ -192,8 +200,10 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .neq('estado', 'entregado')
           .neq('estado', 'cancelado')
           .order('creado_el', ascending: false);
+
+      if (_isDisposed) return; // Evitar que actualice si ya se cerró la app
       _pedidosActivos = datos;
-      notifyListeners();
+      _notificar();
     } catch (e) {
       debugPrint('Error cargando pedidos activos: $e');
     }
@@ -209,8 +219,10 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .or('estado.eq.entregado,estado.eq.cancelado')
           .order('creado_el', ascending: false)
           .limit(50);
+
+      if (_isDisposed) return;
       _historialPedidos = datos;
-      notifyListeners();
+      _notificar();
     } catch (e) {
       debugPrint('Error cargando historial: $e');
     }
@@ -220,7 +232,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
       String idPedido, String nuevoEstado) async {
     try {
       _estaCargando = true;
-      notifyListeners();
+      _notificar();
       Map<String, dynamic> datosActualizar = {'estado': nuevoEstado};
       if (nuevoEstado == 'entregado') {
         datosActualizar['entregado_el'] =
@@ -230,14 +242,11 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .from('pedidos')
           .update(datosActualizar)
           .eq('id', idPedido);
-
-      // Ya no necesitamos llamar a cargarPedidosActivos() o cargarEstadisticasHoy()
-      // de forma manual, el _canalMisPedidos detectará el cambio y lo hará por nosotros.
     } catch (e) {
       debugPrint('Error actualizando pedido: $e');
     } finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
@@ -247,18 +256,14 @@ class InicioNegocioViewModel extends ChangeNotifier {
 
   Future<void> cargarPedidosExpresDisponibles() async {
     try {
-      // 1. Obtener pedidos exprés sin taquería asignada
       final pedidos = await _supabase
           .from('pedidos')
           .select()
           .eq('tipo', 'expres')
           .eq('estado', 'buscando');
 
-      // 2. Obtener la ubicación de esta taquería
       final lat = (_perfil?['latitud'] ?? 0).toDouble();
       final lng = (_perfil?['longitud'] ?? 0).toDouble();
-
-      // 3. Límite de saturación: máximo 5 pedidos activos
       final saturado = _pedidosActivos.length >= 5;
 
       List<Map<String, dynamic>> filtrados = [];
@@ -269,7 +274,6 @@ class InicioNegocioViewModel extends ChangeNotifier {
         final latP = (pedido['lat_cliente'] ?? 0).toDouble();
         final lngP = (pedido['lng_cliente'] ?? 0).toDouble();
 
-        // Si tiene ubicación, filtrar por distancia (5 km)
         if (lat != 0 && lng != 0 && latP != 0 && lngP != 0) {
           final distancia = _calcularDistanciaKm(lat, lng, latP, lngP);
           if (distancia <= 5.0) {
@@ -279,7 +283,6 @@ class InicioNegocioViewModel extends ChangeNotifier {
             });
           }
         } else {
-          // Sin datos de ubicación, mostrar de todas formas
           filtrados.add({
             ...Map<String, dynamic>.from(pedido),
             'distancia_km': '?',
@@ -287,8 +290,9 @@ class InicioNegocioViewModel extends ChangeNotifier {
         }
       }
 
+      if (_isDisposed) return;
       _pedidosExpresDisponibles = filtrados;
-      notifyListeners();
+      _notificar();
     } catch (e) {
       debugPrint('Error cargando exprés disponibles: $e');
     }
@@ -297,11 +301,9 @@ class InicioNegocioViewModel extends ChangeNotifier {
   Future<String?> reclamarPedidoExpres(String pedidoId) async {
     try {
       _estaCargando = true;
-      notifyListeners();
+      _notificar();
 
       final uid = _supabase.auth.currentUser!.id;
-
-      // Verificar que nadie más lo haya tomado
       final actual = await _supabase
           .from('pedidos')
           .select('estado')
@@ -312,23 +314,20 @@ class InicioNegocioViewModel extends ChangeNotifier {
         return 'Este pedido ya fue tomado por otra taquería ⚡';
       }
 
-      // Reclamar
       await _supabase.from('pedidos').update({
         'negocio_id': uid,
         'estado': 'pendiente',
       }).eq('id', pedidoId);
 
-      // El _canalMisPedidos y _canalExpres detectarán estos cambios y recargarán las listas
       return null;
     } catch (e) {
       return 'Error al reclamar el pedido: $e';
     } finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
-  // Haversine formula para calcular distancia en km
   double _calcularDistanciaKm(
       double lat1, double lng1, double lat2, double lng2) {
     const R = 6371.0;
@@ -345,7 +344,9 @@ class InicioNegocioViewModel extends ChangeNotifier {
 
   double _toRad(double deg) => deg * pi / 180;
 
+  // ══════════════════════════════════════════
   // ESTADÍSTICAS DEL DÍA
+  // ══════════════════════════════════════════
 
   Future<void> cargarEstadisticasHoy() async {
     try {
@@ -381,19 +382,22 @@ class InicioNegocioViewModel extends ChangeNotifier {
         }
       }
 
+      if (_isDisposed) return;
       _pedidosHoy = totalPedidos;
       _gananciasHoy = sumaGanancias;
       _tiempoPromedioHoy = pedidosEntregados > 0
           ? "${(sumaMinutos / pedidosEntregados).round()} min"
           : "-- min";
 
-      notifyListeners();
+      _notificar();
     } catch (e) {
       debugPrint('Error cargando estadísticas: $e');
     }
   }
 
+  // ══════════════════════════════════════════
   // PRODUCTOS Y PERFIL
+  // ══════════════════════════════════════════
 
   Future<void> cargarProductos() async {
     try {
@@ -403,8 +407,10 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .select()
           .eq('negocio_id', uid)
           .order('creado_el');
+
+      if (_isDisposed) return;
       _productos = datos;
-      notifyListeners();
+      _notificar();
     } catch (e) {}
   }
 
@@ -418,7 +424,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     File? imagen,
   }) async {
     _estaCargando = true;
-    notifyListeners();
+    _notificar();
     try {
       final uid = _supabase.auth.currentUser!.id;
       String? urlImagen;
@@ -450,7 +456,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
       return 'Error: $e';
     } finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
@@ -465,7 +471,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     File? nuevaImagen,
   }) async {
     _estaCargando = true;
-    notifyListeners();
+    _notificar();
     try {
       final uid = _supabase.auth.currentUser!.id;
       String? urlImagen;
@@ -503,7 +509,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
       return 'Error: $e';
     } finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
@@ -521,12 +527,12 @@ class InicioNegocioViewModel extends ChangeNotifier {
   Future<void> eliminarProducto(String idProducto) async {
     try {
       _estaCargando = true;
-      notifyListeners();
+      _notificar();
       await _supabase.from('productos').delete().eq('id', idProducto);
       await cargarProductos();
     } catch (e) {} finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
@@ -567,7 +573,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
       final resultado = await FilePicker.pickFiles(type: FileType.image);
       if (resultado == null) return null;
       _estaCargando = true;
-      notifyListeners();
+      _notificar();
       final archivo = File(resultado.files.single.path!);
       final uid = _supabase.auth.currentUser!.id;
       final ext = archivo.path.split('.').last;
@@ -592,14 +598,14 @@ class InicioNegocioViewModel extends ChangeNotifier {
       return 'Error: $e';
     } finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
   Future<String?> eliminarFotoGaleria(int index) async {
     try {
       _estaCargando = true;
-      notifyListeners();
+      _notificar();
       final uid = _supabase.auth.currentUser!.id;
       List<String> fotosActualizadas = List.from(galeriaFotos);
       fotosActualizadas.removeAt(index);
@@ -613,7 +619,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
       return 'Error: $e';
     } finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
@@ -624,7 +630,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     required String detalles,
   }) async {
     _estaCargando = true;
-    notifyListeners();
+    _notificar();
     try {
       final uid = _supabase.auth.currentUser!.id;
       await _supabase.from('reportes').insert({
@@ -640,7 +646,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
       return 'Ocurrió un error al enviar el reporte.';
     } finally {
       _estaCargando = false;
-      notifyListeners();
+      _notificar();
     }
   }
 
@@ -650,7 +656,8 @@ class InicioNegocioViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    // Cerramos los canales en tiempo real para evitar pérdida de memoria
+    _isDisposed = true; // Levantamos la bandera para que nadie intente actualizar
+
     if (_canalMisPedidos != null) {
       _supabase.removeChannel(_canalMisPedidos!);
     }
