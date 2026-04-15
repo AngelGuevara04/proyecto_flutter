@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -52,11 +53,15 @@ class ExpresViewModel extends ChangeNotifier {
     required String direccionEntrega,
     required String referencias,
     required String telefonoContacto,
+    required List<Map<String, dynamic>> items,
+    required double totalEstimado,
   }) async {
-    if (descripcion.trim().isEmpty) return 'Describe qué quieres ordenar';
+    if (items.isEmpty) return 'Agrega al menos un item al pedido';
     if (direccionEntrega.trim().isEmpty) return 'Ingresa tu dirección de entrega';
     if (telefonoContacto.trim().isEmpty) return 'Ingresa tu número de contacto';
-    if (!_tieneUbicacion) return 'Necesitamos tu ubicación para encontrar taquerías cercanas';
+    if (!_tieneUbicacion) {
+      return 'Necesitamos tu ubicación para encontrar taquerías cercanas';
+    }
 
     _estaCargando = true;
     notifyListeners();
@@ -64,6 +69,14 @@ class ExpresViewModel extends ChangeNotifier {
     try {
       final user = _supabase.auth.currentUser!;
       final meta = user.userMetadata ?? {};
+
+      // Convertir items al formato estándar de productos
+      final productosParaGuardar = items.map((item) => {
+        'nombre': item['tipo'],
+        'cantidad': item['cantidad'],
+        'precio': item['precio'],
+        'detalles': item['personalizacion'] ?? '',
+      }).toList();
 
       final respuesta = await _supabase.from('pedidos').insert({
         'cliente_id': user.id,
@@ -77,13 +90,14 @@ class ExpresViewModel extends ChangeNotifier {
         'lng_cliente': _lng,
         'tipo': 'expres',
         'estado': 'buscando',
-        'productos': '[]',
-        'total': 0,
+        'productos': jsonEncode(productosParaGuardar),
+        'total': totalEstimado,
       }).select().single();
 
       _pedidoActivoId = respuesta['id'].toString();
       return null;
     } catch (e) {
+      debugPrint('Error creando pedido exprés: $e');
       return 'Error al crear pedido: $e';
     } finally {
       _estaCargando = false;

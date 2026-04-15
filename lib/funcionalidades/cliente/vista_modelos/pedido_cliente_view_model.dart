@@ -167,6 +167,21 @@ class PedidoClienteViewModel extends ChangeNotifier {
     }
   }
 
+  // ── Cancelar pedido (solo cuando está en 'buscando') ──
+  Future<String?> cancelarPedido(String pedidoId) async {
+    try {
+      await _supabase
+          .from('pedidos')
+          .update({'estado': 'cancelado'})
+          .eq('id', pedidoId);
+      _pedidoActivo?['estado'] = 'cancelado';
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return 'Error al cancelar: $e';
+    }
+  }
+
   @override
   void dispose() {
     _canal?.unsubscribe();

@@ -20,6 +20,40 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
     vm.escucharPedido(widget.pedidoId);
   }
 
+  void _confirmarCancelar(BuildContext context, PedidoClienteViewModel vm) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Cancelar pedido?'),
+        content: const Text(
+            'El pedido aún no ha sido tomado por ninguna taquería. ¿Deseas cancelarlo?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('No, esperar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final error = await vm.cancelarPedido(widget.pedidoId);
+              if (!mounted) return;
+              if (error != null) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text(error)));
+              } else {
+                Navigator.pushNamedAndRemoveUntil(
+                    context, '/', (r) => false);
+              }
+            },
+            child: const Text('Sí, cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<PedidoClienteViewModel>();
@@ -144,6 +178,7 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
               ),
             ),
 
+            // ── Confirmar entrega ──
             if (estado == 'reparto')
               ElevatedButton.icon(
                 onPressed: () async {
@@ -156,8 +191,7 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
                   }
                 },
                 icon: const Icon(Icons.check_circle),
-                label:
-                const Text('Confirmar que recibí mi pedido'),
+                label: const Text('Confirmar que recibí mi pedido'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
@@ -165,6 +199,7 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
                 ),
               ),
 
+            // ── Pedido entregado ──
             if (estado == 'entregado') ...[
               const Icon(Icons.check_circle,
                   size: 60, color: Colors.green),
@@ -186,14 +221,29 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
               ),
             ],
 
+            // ── Buscando taquería (exprés) ──
             if (estado == 'buscando') ...[
               const SizedBox(height: 16),
-              const LinearProgressIndicator(color: Colors.deepOrange),
+              const LinearProgressIndicator(
+                  color: Colors.deepOrange),
               const SizedBox(height: 8),
               const Text(
                   'Esperando que una taquería tome tu pedido...',
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                  style:
+                  TextStyle(color: Colors.grey, fontSize: 13),
                   textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              // ── BOTÓN CANCELAR ──
+              OutlinedButton.icon(
+                onPressed: () => _confirmarCancelar(context, vm),
+                icon: const Icon(Icons.cancel, color: Colors.red),
+                label: const Text('Cancelar pedido',
+                    style: TextStyle(color: Colors.red)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.red),
+                  minimumSize: const Size.fromHeight(46),
+                ),
+              ),
             ],
           ],
         ),
@@ -203,25 +253,25 @@ class _PantallaRastrearPedidoState extends State<PantallaRastrearPedido> {
 
   String _textoEstado(String estado) {
     switch (estado) {
-      case 'buscando': return '🔍 Buscando taquería...';
-      case 'pendiente': return '⏳ Esperando confirmación';
-      case 'aceptado': return '✅ Pedido aceptado';
-      case 'preparacion': return '👨‍🍳 Preparando tu orden';
-      case 'reparto': return '🛵 ¡En camino!';
-      case 'entregado': return '🎉 ¡Entregado!';
-      default: return estado;
+      case 'buscando':   return '🔍 Buscando taquería...';
+      case 'pendiente':  return '⏳ Esperando confirmación';
+      case 'aceptado':   return '✅ Pedido aceptado';
+      case 'preparacion':return '👨‍🍳 Preparando tu orden';
+      case 'reparto':    return '🛵 ¡En camino!';
+      case 'entregado':  return '🎉 ¡Entregado!';
+      default:           return estado;
     }
   }
 
   String _subtextoEstado(String estado) {
     switch (estado) {
-      case 'buscando': return 'Estamos encontrando la taquería más cercana para ti';
-      case 'pendiente': return 'La taquería está revisando tu pedido';
-      case 'aceptado': return 'Tu pedido fue aceptado, pronto comenzarán';
+      case 'buscando':    return 'Estamos encontrando la taquería más cercana para ti';
+      case 'pendiente':   return 'La taquería está revisando tu pedido';
+      case 'aceptado':    return 'Tu pedido fue aceptado, pronto comenzarán';
       case 'preparacion': return 'Están preparando tus tacos con cariño 🌮';
-      case 'reparto': return 'El repartidor ya salió con tu pedido';
-      case 'entregado': return '¡Buen provecho!';
-      default: return '';
+      case 'reparto':     return 'El repartidor ya salió con tu pedido';
+      case 'entregado':   return '¡Buen provecho!';
+      default:            return '';
     }
   }
 }
