@@ -68,6 +68,8 @@ class PedidoClienteViewModel extends ChangeNotifier {
     required String direccionEntrega,
     required String referencias,
     required String telefonoContacto,
+    double costoEnvio = 0,
+    double? totalConEnvio,
   }) async {
     if (_carrito.isEmpty) return 'El carrito está vacío';
     if (direccionEntrega.isEmpty) return 'Ingresa tu dirección de entrega';
@@ -99,7 +101,8 @@ class PedidoClienteViewModel extends ChangeNotifier {
         'referencias': referencias,
         'telefono_contacto': telefonoContacto,
         'productos': jsonEncode(productosParaGuardar),
-        'total': total,
+        'total': totalConEnvio ?? total,
+        'costo_envio': costoEnvio,
         'estado': 'pendiente',
         'tipo': 'libre',
       }).select().single();
@@ -120,20 +123,19 @@ class PedidoClienteViewModel extends ChangeNotifier {
   RealtimeChannel? _canal;
 
   void escucharPedido(String pedidoId) {
+    _canal?.unsubscribe();
     _canal = _supabase
-        .channel('pedido_$pedidoId')
+        .channel('pedido_stream_$pedidoId')
         .onPostgresChanges(
       event: PostgresChangeEvent.update,
       schema: 'public',
       table: 'pedidos',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq,
-        column: 'id',
-        value: pedidoId,
-      ),
       callback: (payload) {
-        _pedidoActivo = payload.newRecord;
-        notifyListeners();
+        final id = payload.newRecord['id']?.toString();
+        if (id == pedidoId) {
+          _pedidoActivo = payload.newRecord;
+          notifyListeners();
+        }
       },
     )
         .subscribe();
@@ -167,7 +169,7 @@ class PedidoClienteViewModel extends ChangeNotifier {
     }
   }
 
-  // ── Cancelar pedido (solo cuando está en 'buscando') ──
+  // ── Cancelar pedido ──
   Future<String?> cancelarPedido(String pedidoId) async {
     try {
       await _supabase

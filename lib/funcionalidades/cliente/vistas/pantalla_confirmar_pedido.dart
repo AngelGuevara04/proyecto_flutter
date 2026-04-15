@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../vista_modelos/pedido_cliente_view_model.dart';
-import 'pantalla_rastrear_pedido.dart';
 
 class PantallaConfirmarPedido extends StatefulWidget {
   final Map<String, dynamic> taqueria;
@@ -13,8 +12,7 @@ class PantallaConfirmarPedido extends StatefulWidget {
       _PantallaConfirmarPedidoState();
 }
 
-class _PantallaConfirmarPedidoState
-    extends State<PantallaConfirmarPedido> {
+class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
   final _direccionCtrl = TextEditingController();
   final _referenciasCtrl = TextEditingController();
   final _telefonoCtrl = TextEditingController();
@@ -40,6 +38,21 @@ class _PantallaConfirmarPedidoState
     super.dispose();
   }
 
+  // ── Calcular costo de envío ──
+  double _calcularCostoEnvio(double totalProductos) {
+    final tipo = widget.taqueria['tipo_envio'] ?? 'gratis';
+    final costo = (widget.taqueria['costo_envio'] ?? 0).toDouble();
+    final gratisDesde =
+    (widget.taqueria['envio_gratis_desde'] ?? 0).toDouble();
+
+    if (tipo == 'gratis') return 0;
+    if (tipo == 'fijo') return costo;
+    if (tipo == 'umbral') {
+      return totalProductos >= gratisDesde ? 0 : costo;
+    }
+    return 0;
+  }
+
   String? _validarTelefono(String tel) {
     if (tel.isEmpty) return 'Ingresa tu número de contacto';
     if (tel.length != 10) return 'El número debe tener exactamente 10 dígitos';
@@ -56,6 +69,12 @@ class _PantallaConfirmarPedidoState
         Supabase.instance.client.auth.currentUser?.userMetadata ?? {};
     final nombreCliente = meta['full_name'] ?? 'Cliente';
 
+    final costoEnvio = _calcularCostoEnvio(vm.total);
+    final totalConEnvio = vm.total + costoEnvio;
+    final tipo = widget.taqueria['tipo_envio'] ?? 'gratis';
+    final gratisDesde =
+    (widget.taqueria['envio_gratis_desde'] ?? 0).toDouble();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Confirmar pedido'),
@@ -67,10 +86,9 @@ class _PantallaConfirmarPedidoState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Resumen del carrito
+            // ── Resumen del carrito ──
             const Text('Tu pedido',
-                style:
-                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             ...vm.carrito.map((item) => ListTile(
               dense: true,
@@ -87,13 +105,68 @@ class _PantallaConfirmarPedidoState
                   style: const TextStyle(fontWeight: FontWeight.bold)),
             )),
             const Divider(),
+
+            // ── Desglose de costos ──
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Subtotal:',
+                    style: TextStyle(color: Colors.grey)),
+                Text('\$${vm.total.toStringAsFixed(2)}',
+                    style: const TextStyle(color: Colors.grey)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.delivery_dining,
+                        size: 16,
+                        color: costoEnvio == 0 ? Colors.green : Colors.blue),
+                    const SizedBox(width: 4),
+                    Text(
+                      costoEnvio == 0
+                          ? 'Envío gratis'
+                          : 'Costo de envío:',
+                      style: TextStyle(
+                          color:
+                          costoEnvio == 0 ? Colors.green : Colors.blue),
+                    ),
+                  ],
+                ),
+                Text(
+                  costoEnvio == 0
+                      ? 'Gratis ✅'
+                      : '+\$${costoEnvio.toStringAsFixed(2)}',
+                  style: TextStyle(
+                      color: costoEnvio == 0 ? Colors.green : Colors.blue,
+                      fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+
+            // Mensaje de umbral si aplica
+            if (tipo == 'umbral' && costoEnvio > 0) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Agrega \$${(gratisDesde - vm.total).toStringAsFixed(0)} más para envío gratis',
+                style: const TextStyle(
+                    color: Colors.deepPurple,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic),
+              ),
+            ],
+
+            const Divider(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Total a pagar en efectivo:',
                     style: TextStyle(
                         fontWeight: FontWeight.bold, fontSize: 16)),
-                Text('\$${vm.total.toStringAsFixed(2)}',
+                Text('\$${totalConEnvio.toStringAsFixed(2)}',
                     style: const TextStyle(
                         color: Colors.green,
                         fontWeight: FontWeight.bold,
@@ -102,18 +175,16 @@ class _PantallaConfirmarPedidoState
             ),
             const SizedBox(height: 24),
 
-            // Datos de entrega
+            // ── Datos de entrega ──
             const Text('Datos de entrega',
-                style:
-                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             TextField(
               controller: _direccionCtrl,
               decoration: const InputDecoration(
                 labelText: 'Dirección de entrega',
                 border: OutlineInputBorder(),
-                prefixIcon:
-                Icon(Icons.location_on, color: Colors.orange),
+                prefixIcon: Icon(Icons.location_on, color: Colors.orange),
               ),
             ),
             const SizedBox(height: 12),
@@ -162,7 +233,6 @@ class _PantallaConfirmarPedidoState
               onPressed: vm.estaCargando
                   ? null
                   : () async {
-                // Validar teléfono
                 final errorTel =
                 _validarTelefono(_telefonoCtrl.text.trim());
                 if (errorTel != null) {
@@ -187,6 +257,8 @@ class _PantallaConfirmarPedidoState
                   direccionEntrega: _direccionCtrl.text.trim(),
                   referencias: _referenciasCtrl.text.trim(),
                   telefonoContacto: _telefonoCtrl.text.trim(),
+                  costoEnvio: costoEnvio,
+                  totalConEnvio: totalConEnvio,
                 );
                 if (!mounted) return;
 
@@ -195,19 +267,18 @@ class _PantallaConfirmarPedidoState
                       content: Text(error),
                       backgroundColor: Colors.red));
                 } else {
-                  // Mostrar el mensaje de éxito
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
                         '🌮 Tu pedido ha sido solicitado con éxito, en espera de confirmación de la taquería. Por favor sea paciente.',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold),
                       ),
                       backgroundColor: Colors.green,
-                      duration: Duration(seconds: 4), // Le damos 4 segundos para que lo lea bien
+                      duration: Duration(seconds: 4),
                     ),
                   );
-
-                  // Volver a la pantalla de inicio del cliente (cierra esta ventana y la lista de taquerías)
                   Navigator.popUntil(context, (route) => route.isFirst);
                 }
               },
@@ -218,8 +289,9 @@ class _PantallaConfirmarPedidoState
               ),
               child: vm.estaCargando
                   ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Enviar pedido',
-                  style: TextStyle(
+                  : Text(
+                  'Enviar pedido — \$${totalConEnvio.toStringAsFixed(2)}',
+                  style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ],

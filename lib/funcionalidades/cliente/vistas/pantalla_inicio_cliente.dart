@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../vista_modelos/inicio_cliente_view_model.dart';
@@ -132,8 +133,7 @@ class PantallaInicioCliente extends StatelessWidget {
                   ? const Center(
                   child: Padding(
                     padding: EdgeInsets.all(40),
-                    child:
-                    CircularProgressIndicator(color: Colors.orange),
+                    child: CircularProgressIndicator(color: Colors.orange),
                   ))
                   : viewModel.taqueriasFiltradas.isEmpty
                   ? const Center(
@@ -202,24 +202,52 @@ class PantallaInicioCliente extends StatelessWidget {
     );
   }
 
+  // ── Helper: calcular texto de envío ──
+  String _textoEnvio(Map<String, dynamic> taqueria) {
+    final tipo = taqueria['tipo_envio'] ?? 'gratis';
+    final costo = (taqueria['costo_envio'] ?? 0).toDouble();
+    final gratisDesde = (taqueria['envio_gratis_desde'] ?? 0).toDouble();
+
+    if (tipo == 'gratis') return 'Envío gratis';
+    if (tipo == 'fijo') return 'Envío \$${costo.toStringAsFixed(0)}';
+    if (tipo == 'umbral') {
+      return 'Envío \$${costo.toStringAsFixed(0)} • Gratis +\$${gratisDesde.toStringAsFixed(0)}';
+    }
+    return 'Envío gratis';
+  }
+
+  Color _colorEnvio(Map<String, dynamic> taqueria) {
+    final tipo = taqueria['tipo_envio'] ?? 'gratis';
+    if (tipo == 'gratis') return Colors.green;
+    if (tipo == 'fijo') return Colors.blue;
+    return Colors.deepPurple;
+  }
+
   Widget _tarjetaTaqueria(
       BuildContext context, Map<String, dynamic> taqueria) {
-    final fotos = taqueria['galeria_fotos'];
+    final fotosRaw = taqueria['galeria_fotos'];
     String? urlFoto;
-    if (fotos != null) {
-      final lista = fotos is List ? fotos : [];
-      if (lista.isNotEmpty) urlFoto = lista[0].toString();
+    if (fotosRaw != null) {
+      try {
+        final lista = fotosRaw is String
+            ? jsonDecode(fotosRaw) as List
+            : fotosRaw as List;
+        if (lista.isNotEmpty) urlFoto = lista[0].toString();
+      } catch (e) {
+        debugPrint('Error parseando galeria_fotos: $e');
+      }
     }
 
     return GestureDetector(
       onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (_) => PantallaListaTaquerias(taqueria: taqueria))),
+              builder: (_) =>
+                  PantallaListaTaquerias(taqueria: taqueria))),
       child: Card(
         margin: const EdgeInsets.only(bottom: 14),
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
         elevation: 2,
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -252,7 +280,8 @@ class PantallaInicioCliente extends StatelessWidget {
                       const SizedBox(width: 4),
                       Expanded(
                           child: Text(
-                              taqueria['direccion_texto'] ?? 'Sin dirección',
+                              taqueria['direccion_texto'] ??
+                                  'Sin dirección',
                               style: const TextStyle(
                                   color: Colors.grey, fontSize: 13),
                               maxLines: 1,
@@ -260,20 +289,23 @@ class PantallaInicioCliente extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Row(
+                  // ── Chips con envío incluido ──
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       _chip(Icons.timer,
                           taqueria['tiempo_entrega'] ?? '-- min',
                           Colors.orange),
-                      const SizedBox(width: 8),
-                      _chip(
-                          Icons.star,
+                      _chip(Icons.star,
                           (taqueria['estrellas'] ?? 5.0).toString(),
                           Colors.amber),
-                      const SizedBox(width: 8),
+                      _chip(Icons.delivery_dining,
+                          _textoEnvio(taqueria),
+                          _colorEnvio(taqueria)),
                       _chip(Icons.payments, 'Efectivo', Colors.green),
                     ],
-                  )
+                  ),
                 ],
               ),
             )

@@ -54,6 +54,38 @@ class _ContenidoState extends State<_Contenido> {
     }
   }
 
+  // ── Calcular costo de envío según configuración ──
+  double _calcularCostoEnvio(double totalProductos) {
+    final tipo = widget.taqueria['tipo_envio'] ?? 'gratis';
+    final costo = (widget.taqueria['costo_envio'] ?? 0).toDouble();
+    final gratisDesde =
+    (widget.taqueria['envio_gratis_desde'] ?? 0).toDouble();
+
+    if (tipo == 'gratis') return 0;
+    if (tipo == 'fijo') return costo;
+    if (tipo == 'umbral') {
+      return totalProductos >= gratisDesde ? 0 : costo;
+    }
+    return 0;
+  }
+
+  String _textoEnvioBoton(double totalProductos) {
+    final tipo = widget.taqueria['tipo_envio'] ?? 'gratis';
+    final costo = (widget.taqueria['costo_envio'] ?? 0).toDouble();
+    final gratisDesde =
+    (widget.taqueria['envio_gratis_desde'] ?? 0).toDouble();
+    final costoEnvio = _calcularCostoEnvio(totalProductos);
+
+    if (tipo == 'gratis') return 'Envío gratis';
+    if (tipo == 'fijo') return '+\$${costo.toStringAsFixed(0)} envío';
+    if (tipo == 'umbral') {
+      if (totalProductos >= gratisDesde) return 'Envío gratis 🎉';
+      final falta = gratisDesde - totalProductos;
+      return '+\$${costoEnvio.toStringAsFixed(0)} envío (falta \$${falta.toStringAsFixed(0)} para gratis)';
+    }
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<PedidoClienteViewModel>();
@@ -63,6 +95,9 @@ class _ContenidoState extends State<_Contenido> {
       final parsed = fotos is String ? jsonDecode(fotos) : fotos;
       listaFotos = List<String>.from(parsed ?? []);
     }
+
+    final costoEnvio = _calcularCostoEnvio(vm.total);
+    final totalConEnvio = vm.total + costoEnvio;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -79,11 +114,15 @@ class _ContenidoState extends State<_Contenido> {
                   style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      shadows: [Shadow(blurRadius: 8, color: Colors.black54)])),
+                      shadows: [
+                        Shadow(blurRadius: 8, color: Colors.black54)
+                      ])),
               background: listaFotos.isNotEmpty
                   ? Image.network(listaFotos[0], fit: BoxFit.cover)
-                  : Container(color: Colors.orange.shade300,
-                  child: const Icon(Icons.storefront, size: 80, color: Colors.white)),
+                  : Container(
+                  color: Colors.orange.shade300,
+                  child: const Icon(Icons.storefront,
+                      size: 80, color: Colors.white)),
             ),
           ),
 
@@ -91,14 +130,18 @@ class _ContenidoState extends State<_Contenido> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 8,
                 children: [
                   _badge(Icons.timer,
-                      widget.taqueria['tiempo_entrega'] ?? '--', Colors.orange),
-                  const SizedBox(width: 10),
+                      widget.taqueria['tiempo_entrega'] ?? '--',
+                      Colors.orange),
                   _badge(Icons.star,
-                      (widget.taqueria['estrellas'] ?? 5.0).toString(), Colors.amber),
-                  const SizedBox(width: 10),
+                      (widget.taqueria['estrellas'] ?? 5.0).toString(),
+                      Colors.amber),
+                  _badge(Icons.delivery_dining,
+                      _textoEnvioDetalle(), _colorEnvio()),
                   _badge(Icons.payments, 'Efectivo', Colors.green),
                 ],
               ),
@@ -110,7 +153,8 @@ class _ContenidoState extends State<_Contenido> {
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text('Menú',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold)),
             ),
           ),
 
@@ -119,7 +163,9 @@ class _ContenidoState extends State<_Contenido> {
               ? const SliverToBoxAdapter(
               child: Padding(
                 padding: EdgeInsets.all(40),
-                child: Center(child: CircularProgressIndicator(color: Colors.orange)),
+                child: Center(
+                    child: CircularProgressIndicator(
+                        color: Colors.orange)),
               ))
               : _productos.isEmpty
               ? const SliverToBoxAdapter(
@@ -146,38 +192,97 @@ class _ContenidoState extends State<_Contenido> {
           ? SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: ElevatedButton(
-            onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => ChangeNotifierProvider.value(
-                        value: vm,
-                        child: PantallaConfirmarPedido(
-                            taqueria: widget.taqueria)))),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                CircleAvatar(
-                    radius: 12,
-                    backgroundColor: Colors.white,
-                    child: Text('${vm.totalItems}',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ── Desglose de envío ──
+              if (costoEnvio > 0 || widget.taqueria['tipo_envio'] != null)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Subtotal productos:',
+                              style: TextStyle(color: Colors.grey)),
+                          Text('\$${vm.total.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                  color: Colors.grey)),
+                        ],
+                      ),
+                      Row(
+                        mainAxisAlignment:
+                        MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(_textoEnvioBoton(vm.total),
+                              style: TextStyle(
+                                  color: costoEnvio == 0
+                                      ? Colors.green
+                                      : Colors.blue,
+                                  fontSize: 12)),
+                          Text(
+                              costoEnvio == 0
+                                  ? 'Gratis'
+                                  : '+\$${costoEnvio.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                  color: costoEnvio == 0
+                                      ? Colors.green
+                                      : Colors.blue,
+                                  fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+              // ── Botón principal ──
+              ElevatedButton(
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => ChangeNotifierProvider.value(
+                            value: vm,
+                            child: PantallaConfirmarPedido(
+                                taqueria: widget.taqueria)))),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    CircleAvatar(
+                        radius: 12,
+                        backgroundColor: Colors.white,
+                        child: Text('${vm.totalItems}',
+                            style: const TextStyle(
+                                color: Colors.orange,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12))),
+                    const Text('Ver pedido',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
+                    Text(
+                        '\$${totalConEnvio.toStringAsFixed(2)}',
                         style: const TextStyle(
-                            color: Colors.orange,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12))),
-                const Text('Ver pedido',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                Text('\$${vm.total.toStringAsFixed(2)}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       )
@@ -185,19 +290,42 @@ class _ContenidoState extends State<_Contenido> {
     );
   }
 
+  String _textoEnvioDetalle() {
+    final tipo = widget.taqueria['tipo_envio'] ?? 'gratis';
+    final costo = (widget.taqueria['costo_envio'] ?? 0).toDouble();
+    final gratisDesde =
+    (widget.taqueria['envio_gratis_desde'] ?? 0).toDouble();
+
+    if (tipo == 'gratis') return 'Envío gratis';
+    if (tipo == 'fijo') return 'Envío \$${costo.toStringAsFixed(0)}';
+    if (tipo == 'umbral') {
+      return 'Envío \$${costo.toStringAsFixed(0)} • Gratis +\$${gratisDesde.toStringAsFixed(0)}';
+    }
+    return 'Envío gratis';
+  }
+
+  Color _colorEnvio() {
+    final tipo = widget.taqueria['tipo_envio'] ?? 'gratis';
+    if (tipo == 'gratis') return Colors.green;
+    if (tipo == 'fijo') return Colors.blue;
+    return Colors.deepPurple;
+  }
+
   Widget _tarjetaProducto(
       BuildContext context, PedidoClienteViewModel vm, dynamic producto) {
     final cantidad = vm.cantidadEnCarrito(producto['id'].toString());
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape:
+      RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
             // Imagen
             Container(
-              width: 80, height: 80,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(10),
@@ -224,8 +352,8 @@ class _ContenidoState extends State<_Contenido> {
                     Text(producto['descripcion'],
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                        const TextStyle(color: Colors.grey, fontSize: 12)),
+                        style: const TextStyle(
+                            color: Colors.grey, fontSize: 12)),
                   const SizedBox(height: 6),
                   Text('\$${producto['precio']}',
                       style: const TextStyle(
@@ -243,7 +371,8 @@ class _ContenidoState extends State<_Contenido> {
                     onTap: () =>
                         vm.quitarDelCarrito(producto['id'].toString()),
                     child: Container(
-                      width: 30, height: 30,
+                      width: 30,
+                      height: 30,
                       decoration: BoxDecoration(
                           color: Colors.orange.shade50,
                           shape: BoxShape.circle,
@@ -267,10 +396,12 @@ class _ContenidoState extends State<_Contenido> {
                     'detalles': '',
                   }),
                   child: Container(
-                    width: 30, height: 30,
+                    width: 30,
+                    height: 30,
                     decoration: const BoxDecoration(
                         color: Colors.orange, shape: BoxShape.circle),
-                    child: const Icon(Icons.add, size: 16, color: Colors.white),
+                    child: const Icon(Icons.add,
+                        size: 16, color: Colors.white),
                   ),
                 ),
               ],
