@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../vista_modelos/expres_view_model.dart';
+import 'pantalla_modulo_expres.dart';
+import '../vista_modelos/pedido_cliente_view_model.dart';
+import 'pantalla_rastrear_pedido.dart';
 
 class PantallaMisPedidosCliente extends StatefulWidget {
   const PantallaMisPedidosCliente({super.key});
@@ -40,6 +45,7 @@ class _PantallaMisPedidosClienteState
         _cargando = false;
       });
     } catch (e) {
+      debugPrint('Error cargando pedidos: $e');
       setState(() => _cargando = false);
     }
   }
@@ -62,26 +68,24 @@ class _PantallaMisPedidosClienteState
         .subscribe();
   }
 
-  // Oculta un pedido individual
   Future<void> _ocultarPedido(String pedidoId) async {
     try {
       await _supabase
           .from('pedidos')
           .update({'oculto_cliente': true})
           .eq('id', pedidoId);
+      // Actualizar localmente sin esperar al listener
       setState(() {
         _pedidos.removeWhere((p) => p['id'].toString() == pedidoId);
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al eliminar el pedido')),
-        );
+            const SnackBar(content: Text('Error al eliminar el pedido')));
       }
     }
   }
 
-  // Oculta todo el historial de una vez
   Future<void> _limpiarTodoElHistorial() async {
     try {
       final uid = _supabase.auth.currentUser!.id;
@@ -89,38 +93,34 @@ class _PantallaMisPedidosClienteState
           .from('pedidos')
           .update({'oculto_cliente': true})
           .eq('cliente_id', uid)
-          .inFilter('estado', ['entregado', 'cancelado']);
+          .inFilter('estado', ['entregado', 'cancelado', 'rechazado']);
       await _cargar();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Historial limpiado correctamente'),
-            backgroundColor: Colors.green,
-          ),
+              content: Text('Historial limpiado correctamente'),
+              backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al limpiar el historial')),
-        );
+            const SnackBar(content: Text('Error al limpiar el historial')));
       }
     }
   }
 
-  // Diálogo de confirmación para borrar todo
   void _confirmarLimpiarTodo() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Limpiar historial?'),
         content: const Text(
-            'Se eliminarán de tu vista todos los pedidos entregados y cancelados. El negocio seguirá teniendo acceso al registro.'),
+            'Se eliminarán de tu vista todos los pedidos finalizados, cancelados y rechazados.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red, foregroundColor: Colors.white),
@@ -135,18 +135,17 @@ class _PantallaMisPedidosClienteState
     );
   }
 
-  // Diálogo de confirmación para borrar uno
   void _confirmarOcultarPedido(String pedidoId) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('¿Eliminar este pedido?'),
-        content: const Text('Se quitará de tu historial pero el negocio seguirá viéndolo.'),
+        content: const Text(
+            'Se quitará de tu historial pero el negocio seguirá viéndolo.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red, foregroundColor: Colors.white),
@@ -155,6 +154,51 @@ class _PantallaMisPedidosClienteState
               _ocultarPedido(pedidoId);
             },
             child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _convertirAExpres(Map<String, dynamic> pedido) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('⚡ Convertir a Modo Exprés'),
+        content: const Text(
+            'Tu pedido fue rechazado. ¿Quieres reenviarlo en modo exprés para que la primera taquería disponible lo tome?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('No, cancelar')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepOrange,
+                foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.pop(ctx);
+              // Ocultar el pedido rechazado
+              _ocultarPedido(pedido['id'].toString());
+              // Navegar al módulo exprés con datos prellenados
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ChangeNotifierProvider(
+                    create: (_) => ExpresViewModel(),
+                    child: PantallaModuloExpres(
+                      descripcionInicial:
+                      pedido['descripcion_expres'] ?? '',
+                      direccionInicial:
+                      pedido['direccion_entrega'] ?? '',
+                      referenciasInicial: pedido['referencias'] ?? '',
+                      telefonoInicial:
+                      pedido['telefono_contacto'] ?? '',
+                    ),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Sí, enviar exprés ⚡'),
           ),
         ],
       ),
@@ -170,7 +214,7 @@ class _PantallaMisPedidosClienteState
   @override
   Widget build(BuildContext context) {
     final hayHistorial = _pedidos.any((p) =>
-        ['entregado', 'cancelado'].contains(p['estado']));
+        ['entregado', 'cancelado', 'rechazado'].contains(p['estado']));
 
     return Scaffold(
       appBar: AppBar(
@@ -178,7 +222,6 @@ class _PantallaMisPedidosClienteState
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
         actions: [
-          // Botón limpiar todo — solo aparece si hay pedidos finalizados
           if (hayHistorial)
             IconButton(
               icon: const Icon(Icons.delete_sweep),
@@ -198,7 +241,8 @@ class _PantallaMisPedidosClienteState
               Icon(Icons.receipt_long, size: 70, color: Colors.grey),
               SizedBox(height: 16),
               Text('Aún no has realizado pedidos',
-                  style: TextStyle(color: Colors.grey, fontSize: 16)),
+                  style:
+                  TextStyle(color: Colors.grey, fontSize: 16)),
             ],
           ))
           : RefreshIndicator(
@@ -212,19 +256,22 @@ class _PantallaMisPedidosClienteState
             final estado = p['estado'];
             final fecha =
             DateTime.parse(p['creado_el']).toLocal();
-            final estaFinalizado =
-            ['entregado', 'cancelado'].contains(estado);
-            final activo = !estaFinalizado;
+            final esFinalizado = [
+              'entregado',
+              'cancelado',
+              'rechazado'
+            ].contains(estado);
+            final activo = !esFinalizado;
+            final esRechazado = estado == 'rechazado';
 
             return Dismissible(
-              // Deslizar para eliminar — solo en pedidos finalizados
               key: Key(p['id'].toString()),
-              direction: estaFinalizado
+              direction: esFinalizado
                   ? DismissDirection.endToStart
                   : DismissDirection.none,
               confirmDismiss: (_) async {
                 _confirmarOcultarPedido(p['id'].toString());
-                return false; // Lo manejamos manualmente
+                return false;
               },
               background: Container(
                 alignment: Alignment.centerRight,
@@ -236,7 +283,8 @@ class _PantallaMisPedidosClienteState
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.delete, color: Colors.white, size: 28),
+                    Icon(Icons.delete,
+                        color: Colors.white, size: 28),
                     Text('Eliminar',
                         style: TextStyle(
                             color: Colors.white, fontSize: 12)),
@@ -247,45 +295,95 @@ class _PantallaMisPedidosClienteState
                 margin: const EdgeInsets.only(bottom: 12),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: activo
-                        ? Colors.orange.shade100
-                        : Colors.grey.shade200,
-                    child: Icon(
-                        activo
-                            ? Icons.delivery_dining
-                            : Icons.check_circle,
-                        color: activo
-                            ? Colors.orange
-                            : Colors.grey),
-                  ),
-                  title: Text(
-                      'Pedido #${p['id'].toString().substring(0, 5).toUpperCase()}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(DateFormat('dd/MM/yyyy HH:mm')
-                          .format(fecha)),
-                      Text(
-                          '\$${p['total']} • ${_etiqueta(estado)}',
-                          style: TextStyle(
-                              color: _colorEstado(estado),
+                // Resaltar pedidos rechazados
+                color: esRechazado
+                    ? Colors.red.shade50
+                    : Colors.white,
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: esRechazado
+                            ? Colors.red.shade100
+                            : activo
+                            ? Colors.orange.shade100
+                            : Colors.grey.shade200,
+                        child: Icon(
+                          esRechazado
+                              ? Icons.cancel
+                              : activo
+                              ? Icons.delivery_dining
+                              : Icons.check_circle,
+                          color: esRechazado
+                              ? Colors.red
+                              : activo
+                              ? Colors.orange
+                              : Colors.grey,
+                        ),
+                      ),
+                      title: Text(
+                          'Pedido #${p['id'].toString().substring(0, 5).toUpperCase()}',
+                          style: const TextStyle(
                               fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  isThreeLine: true,
-                  // Botón de eliminar individual en pedidos finalizados
-                  trailing: estaFinalizado
-                      ? IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: Colors.red),
-                    onPressed: () => _confirmarOcultarPedido(
-                        p['id'].toString()),
-                  )
-                      : null,
+                      subtitle: Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                        children: [
+                          Text(DateFormat('dd/MM/yyyy HH:mm')
+                              .format(fecha)),
+                          Text(
+                              '\$${p['total']} • ${_etiqueta(estado)}',
+                              style: TextStyle(
+                                  color: _colorEstado(estado),
+                                  fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      isThreeLine: true,
+                      trailing: esFinalizado
+                          ? IconButton(
+                        icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red),
+                        onPressed: () =>
+                            _confirmarOcultarPedido(
+                                p['id'].toString()),
+                      )
+                          : null,
+                      onTap: activo
+                          ? () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ChangeNotifierProvider(
+                                create: (_) =>
+                                    PedidoClienteViewModel(),
+                                child: PantallaRastrearPedido(
+                                    pedidoId:
+                                    p['id'].toString()),
+                              ),
+                        ),
+                      )
+                          : null,
+                    ),
+                    // Botón especial para pedidos rechazados
+                    if (esRechazado)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                            16, 0, 16, 12),
+                        child: ElevatedButton.icon(
+                          onPressed: () => _convertirAExpres(p),
+                          icon: const Icon(Icons.flash_on),
+                          label: const Text(
+                              'Reenviar en Modo Exprés'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.deepOrange,
+                            foregroundColor: Colors.white,
+                            minimumSize:
+                            const Size.fromHeight(40),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             );
@@ -303,6 +401,8 @@ class _PantallaMisPedidosClienteState
       case 'reparto': return 'En camino';
       case 'entregado': return 'Entregado';
       case 'cancelado': return 'Cancelado';
+      case 'rechazado': return 'Rechazado por la taquería';
+      case 'buscando': return 'Buscando taquería ⚡';
       default: return estado;
     }
   }
@@ -310,8 +410,10 @@ class _PantallaMisPedidosClienteState
   Color _colorEstado(String estado) {
     switch (estado) {
       case 'entregado': return Colors.green;
-      case 'cancelado': return Colors.red;
+      case 'cancelado': return Colors.grey;
+      case 'rechazado': return Colors.red;
       case 'reparto': return Colors.teal;
+      case 'buscando': return Colors.deepOrange;
       default: return Colors.orange;
     }
   }

@@ -13,7 +13,8 @@ class PantallaConfirmarPedido extends StatefulWidget {
       _PantallaConfirmarPedidoState();
 }
 
-class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
+class _PantallaConfirmarPedidoState
+    extends State<PantallaConfirmarPedido> {
   final _direccionCtrl = TextEditingController();
   final _referenciasCtrl = TextEditingController();
   final _telefonoCtrl = TextEditingController();
@@ -21,7 +22,6 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
   @override
   void initState() {
     super.initState();
-    // Pre-llenamos con los datos del perfil si los tiene
     final meta =
         Supabase.instance.client.auth.currentUser?.userMetadata ?? {};
     final calle = meta['calle'] ?? '';
@@ -38,6 +38,15 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
     _referenciasCtrl.dispose();
     _telefonoCtrl.dispose();
     super.dispose();
+  }
+
+  String? _validarTelefono(String tel) {
+    if (tel.isEmpty) return 'Ingresa tu número de contacto';
+    if (tel.length != 10) return 'El número debe tener exactamente 10 dígitos';
+    if (!RegExp(r'^[0-9]+$').hasMatch(tel)) {
+      return 'El número solo debe contener dígitos';
+    }
+    return null;
   }
 
   @override
@@ -60,7 +69,8 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
           children: [
             // Resumen del carrito
             const Text('Tu pedido',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                style:
+                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             ...vm.carrito.map((item) => ListTile(
               dense: true,
@@ -81,7 +91,8 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Total a pagar en efectivo:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
                 Text('\$${vm.total.toStringAsFixed(2)}',
                     style: const TextStyle(
                         color: Colors.green,
@@ -93,14 +104,16 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
 
             // Datos de entrega
             const Text('Datos de entrega',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                style:
+                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             TextField(
               controller: _direccionCtrl,
               decoration: const InputDecoration(
                 labelText: 'Dirección de entrega',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.location_on, color: Colors.orange),
+                prefixIcon:
+                Icon(Icons.location_on, color: Colors.orange),
               ),
             ),
             const SizedBox(height: 12),
@@ -109,17 +122,20 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
               decoration: const InputDecoration(
                 labelText: 'Referencias (color de casa, entre calles...)',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.info_outline, color: Colors.orange),
+                prefixIcon:
+                Icon(Icons.info_outline, color: Colors.orange),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _telefonoCtrl,
               keyboardType: TextInputType.phone,
+              maxLength: 10,
               decoration: const InputDecoration(
-                labelText: 'Número de contacto',
+                labelText: 'Número de contacto (10 dígitos)',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone, color: Colors.orange),
+                counterText: '',
               ),
             ),
             const SizedBox(height: 10),
@@ -134,7 +150,9 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
                   Icon(Icons.payments, color: Colors.green),
                   SizedBox(width: 8),
                   Text('El pago se realiza en efectivo al recibir.',
-                      style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                      style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -144,6 +162,25 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
               onPressed: vm.estaCargando
                   ? null
                   : () async {
+                // Validar teléfono
+                final errorTel =
+                _validarTelefono(_telefonoCtrl.text.trim());
+                if (errorTel != null) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(errorTel),
+                      backgroundColor: Colors.red));
+                  return;
+                }
+
+                if (_direccionCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content:
+                          Text('Ingresa tu dirección de entrega'),
+                          backgroundColor: Colors.red));
+                  return;
+                }
+
                 final error = await vm.crearPedidoLibre(
                   negocioId: widget.taqueria['usuario_id'],
                   nombreCliente: nombreCliente,
@@ -153,8 +190,9 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
                 );
                 if (!mounted) return;
                 if (error != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(error), backgroundColor: Colors.red));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(error),
+                      backgroundColor: Colors.red));
                 } else {
                   Navigator.pushAndRemoveUntil(
                     context,
@@ -175,7 +213,8 @@ class _PantallaConfirmarPedidoState extends State<PantallaConfirmarPedido> {
               child: vm.estaCargando
                   ? const CircularProgressIndicator(color: Colors.white)
                   : const Text('Enviar pedido',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ],
         ),

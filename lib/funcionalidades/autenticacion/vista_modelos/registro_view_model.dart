@@ -34,17 +34,15 @@ class RegistroViewModel extends ChangeNotifier {
   Future<String?> registrarUsuario(
       String nombre,
       String apellidoPat,
-      String apellidoMat,
+      String apellidoMat, // puede estar vacío
       String correo,
       String contrasena,
       String confirmarContrasena,
       ) async {
-    if (nombre.isEmpty ||
-        apellidoPat.isEmpty ||
-        apellidoMat.isEmpty ||
-        correo.isEmpty ||
-        contrasena.isEmpty) {
-      return 'Por favor completa todos los campos';
+    // ── Validaciones ──
+    if (nombre.isEmpty || apellidoPat.isEmpty ||
+        correo.isEmpty || contrasena.isEmpty) {
+      return 'Por favor completa los campos obligatorios';
     }
 
     if (contrasena.length < 6) {
@@ -67,6 +65,11 @@ class RegistroViewModel extends ChangeNotifier {
     try {
       final rolAsignado = _esNegocio ? 'negocio' : 'usuario';
 
+      // Construir nombre completo (apellido materno es opcional)
+      final partes = [nombre, apellidoPat];
+      if (apellidoMat.isNotEmpty) partes.add(apellidoMat);
+      final nombreCompleto = partes.join(' ');
+
       await _supabase.auth.signUp(
         email: correo,
         password: contrasena,
@@ -74,11 +77,9 @@ class RegistroViewModel extends ChangeNotifier {
         data: {
           'first_name': nombre,
           'paternal_last_name': apellidoPat,
-          'maternal_last_name': apellidoMat,
-          'full_name': '$nombre $apellidoPat $apellidoMat',
+          'maternal_last_name': apellidoMat, // puede estar vacío
+          'full_name': nombreCompleto,
           'rol': rolAsignado,
-          // Negocio arranca sin solicitud enviada
-          // El estatus cambia a 'pendiente' cuando envía documentos
           'estatus_aprobacion':
           rolAsignado == 'negocio' ? 'sin_solicitud' : 'aprobado',
           'perfil_completado': false,

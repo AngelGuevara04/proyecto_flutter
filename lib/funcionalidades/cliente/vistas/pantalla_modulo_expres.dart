@@ -6,29 +6,57 @@ import '../vista_modelos/pedido_cliente_view_model.dart';
 import 'pantalla_rastrear_pedido.dart';
 
 class PantallaModuloExpres extends StatefulWidget {
-  const PantallaModuloExpres({super.key});
+  // Parámetros opcionales para cuando viene de un pedido rechazado
+  final String descripcionInicial;
+  final String direccionInicial;
+  final String referenciasInicial;
+  final String telefonoInicial;
+
+  const PantallaModuloExpres({
+    super.key,
+    this.descripcionInicial = '',
+    this.direccionInicial = '',
+    this.referenciasInicial = '',
+    this.telefonoInicial = '',
+  });
 
   @override
-  State<PantallaModuloExpres> createState() => _PantallaModuloExpresState();
+  State<PantallaModuloExpres> createState() =>
+      _PantallaModuloExpresState();
 }
 
 class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
-  final _descripcionCtrl = TextEditingController();
-  final _direccionCtrl = TextEditingController();
-  final _referenciasCtrl = TextEditingController();
-  final _telefonoCtrl = TextEditingController();
+  late TextEditingController _descripcionCtrl;
+  late TextEditingController _direccionCtrl;
+  late TextEditingController _referenciasCtrl;
+  late TextEditingController _telefonoCtrl;
 
   @override
   void initState() {
     super.initState();
-    final meta =
-        Supabase.instance.client.auth.currentUser?.userMetadata ?? {};
-    final calle = meta['calle'] ?? '';
-    final colonia = meta['colonia'] ?? '';
-    final ciudad = meta['ciudad'] ?? '';
-    if (calle.isNotEmpty) {
-      _direccionCtrl.text = '$calle, $colonia, $ciudad'.trim();
+    _descripcionCtrl =
+        TextEditingController(text: widget.descripcionInicial);
+    _telefonoCtrl =
+        TextEditingController(text: widget.telefonoInicial);
+    _referenciasCtrl =
+        TextEditingController(text: widget.referenciasInicial);
+
+    // Dirección: usar la del pedido rechazado o la del perfil
+    if (widget.direccionInicial.isNotEmpty) {
+      _direccionCtrl =
+          TextEditingController(text: widget.direccionInicial);
+    } else {
+      final meta =
+          Supabase.instance.client.auth.currentUser?.userMetadata ?? {};
+      final calle = meta['calle'] ?? '';
+      final colonia = meta['colonia'] ?? '';
+      final ciudad = meta['ciudad'] ?? '';
+      _direccionCtrl = TextEditingController(
+          text: calle.isNotEmpty
+              ? '$calle, $colonia, $ciudad'.trim()
+              : '');
     }
+
     Future.microtask(
             () => context.read<ExpresViewModel>().obtenerUbicacion());
   }
@@ -108,7 +136,8 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
                         ? 'Obteniendo ubicación...'
                         : 'Sin ubicación',
                     style: TextStyle(
-                      color: vm.tieneUbicacion ? Colors.green : Colors.grey,
+                      color:
+                      vm.tieneUbicacion ? Colors.green : Colors.grey,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -126,15 +155,15 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
 
             // Descripción
             const Text('¿Qué quieres ordenar?',
-                style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
               controller: _descripcionCtrl,
               maxLines: 3,
               decoration: const InputDecoration(
                 hintText:
-                'Ej. 5 tacos de pastor con todo, 2 quesadillas de queso...',
+                'Ej. 5 tacos de pastor con todo, 2 quesadillas...',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -142,8 +171,8 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
 
             // Datos entrega
             const Text('Datos de entrega',
-                style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
               controller: _direccionCtrl,
@@ -168,10 +197,12 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
             TextField(
               controller: _telefonoCtrl,
               keyboardType: TextInputType.phone,
+              maxLength: 10,
               decoration: const InputDecoration(
-                labelText: 'Número de contacto',
+                labelText: 'Número de contacto (10 dígitos)',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.phone, color: Colors.deepOrange),
+                counterText: '',
               ),
             ),
             const SizedBox(height: 12),
@@ -200,11 +231,23 @@ class _PantallaModuloExpresState extends State<PantallaModuloExpres> {
               onPressed: vm.estaCargando
                   ? null
                   : () async {
+                // Validar teléfono
+                final tel = _telefonoCtrl.text.trim();
+                if (tel.length != 10 ||
+                    !RegExp(r'^[0-9]+$').hasMatch(tel)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'El número de teléfono debe tener exactamente 10 dígitos'),
+                          backgroundColor: Colors.red));
+                  return;
+                }
+
                 final error = await vm.crearPedidoExpres(
                   descripcion: _descripcionCtrl.text,
                   direccionEntrega: _direccionCtrl.text,
                   referencias: _referenciasCtrl.text,
-                  telefonoContacto: _telefonoCtrl.text,
+                  telefonoContacto: tel,
                 );
                 if (!mounted) return;
                 if (error != null) {

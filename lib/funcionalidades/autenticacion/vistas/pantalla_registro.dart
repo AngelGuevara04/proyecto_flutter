@@ -34,7 +34,7 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
     final error = await viewModel.registrarUsuario(
       _controladorNombre.text.trim(),
       _controladorApellidoPat.text.trim(),
-      _controladorApellidoMat.text.trim(),
+      _controladorApellidoMat.text.trim(), // puede estar vacío
       _controladorCorreo.text.trim(),
       _controladorContrasena.text,
       _controladorConfirmarContrasena.text,
@@ -44,7 +44,8 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
 
     if (error == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('¡Bienvenido a TacoHub! Registro exitoso.')),
+        const SnackBar(
+            content: Text('¡Bienvenido a TacoHub! Registro exitoso.')),
       );
       Navigator.pop(context);
     } else {
@@ -94,12 +95,14 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
               enabled: !viewModel.estaCargando,
             ),
             const SizedBox(height: 16),
+            // ── APELLIDO MATERNO OPCIONAL ──
             TextField(
               controller: _controladorApellidoMat,
               decoration: const InputDecoration(
-                labelText: 'Apellido Materno',
+                labelText: 'Apellido Materno (opcional)',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.person_outline),
+                helperText: 'Déjalo vacío si no tienes apellido materno',
               ),
               enabled: !viewModel.estaCargando,
             ),
@@ -124,7 +127,9 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.lock),
                 suffixIcon: IconButton(
-                  icon: Icon(viewModel.ocultarContrasena ? Icons.visibility_off : Icons.visibility),
+                  icon: Icon(viewModel.ocultarContrasena
+                      ? Icons.visibility_off
+                      : Icons.visibility),
                   onPressed: viewModel.alternarVisibilidadContrasena,
                 ),
               ),
@@ -139,26 +144,33 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.lock_outline),
                 suffixIcon: IconButton(
-                  icon: Icon(viewModel.ocultarConfirmarContrasena ? Icons.visibility_off : Icons.visibility),
-                  onPressed: viewModel.alternarVisibilidadConfirmarContrasena,
+                  icon: Icon(viewModel.ocultarConfirmarContrasena
+                      ? Icons.visibility_off
+                      : Icons.visibility),
+                  onPressed:
+                  viewModel.alternarVisibilidadConfirmarContrasena,
                 ),
               ),
               enabled: !viewModel.estaCargando,
             ),
             const SizedBox(height: 16),
             CheckboxListTile(
-              title: const Text("Soy un negocio (Taquería)"),
-              subtitle: const Text("Necesitarás validar tus documentos después"),
+              title: const Text('Soy un negocio (Taquería)'),
+              subtitle:
+              const Text('Necesitarás validar tus documentos después'),
               value: viewModel.esNegocio,
               onChanged: viewModel.estaCargando
                   ? null
-                  : (valor) => viewModel.cambiarTipoNegocio(valor ?? false),
+                  : (valor) =>
+                  viewModel.cambiarTipoNegocio(valor ?? false),
               activeColor: Colors.orange,
               controlAffinity: ListTileControlAffinity.leading,
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: viewModel.estaCargando ? null : () => _procesarRegistro(viewModel),
+              onPressed: viewModel.estaCargando
+                  ? null
+                  : () => _procesarRegistro(viewModel),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
@@ -170,8 +182,11 @@ class _PantallaRegistroState extends State<PantallaRegistro> {
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: viewModel.estaCargando ? null : () => Navigator.pop(context),
-              child: const Text('¿Ya eres parte de TacoHub? Inicia sesión'),
+              onPressed: viewModel.estaCargando
+                  ? null
+                  : () => Navigator.pop(context),
+              child:
+              const Text('¿Ya eres parte de TacoHub? Inicia sesión'),
             ),
           ],
         ),
