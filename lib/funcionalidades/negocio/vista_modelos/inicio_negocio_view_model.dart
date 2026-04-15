@@ -127,20 +127,24 @@ class InicioNegocioViewModel extends ChangeNotifier {
     if (_canalMisPedidos != null) _supabase.removeChannel(_canalMisPedidos!);
     if (_canalExpres != null) _supabase.removeChannel(_canalExpres!);
 
-    // Canal 1: Escucha cambios en pedidos ya asignados a esta taquería
+    // Canal 1: Sin filtro de Supabase — filtramos manualmente por negocio_id
+    // Razón: el filtro por UUID en Realtime falla silenciosamente
     _canalMisPedidos = _supabase
         .channel('mis_pedidos_negocio_$uid')
         .onPostgresChanges(
       event: PostgresChangeEvent.all,
       schema: 'public',
       table: 'pedidos',
-      filter: PostgresChangeFilter(
-        type: PostgresChangeFilterType.eq,
-        column: 'negocio_id',
-        value: uid,
-      ),
       callback: (payload) {
         if (_isDisposed) return;
+
+        final negocioId =
+            payload.newRecord['negocio_id']?.toString() ??
+                payload.oldRecord['negocio_id']?.toString();
+
+        // Solo procesamos pedidos de esta taquería
+        if (negocioId != uid) return;
+
         debugPrint('Tiempo real: cambio en Mis Pedidos');
         cargarPedidosActivos();
         cargarEstadisticasHoy();
@@ -179,7 +183,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
         }
 
         // ── Caso 2: Pedido exprés ya no está disponible ──
-        // Cubre: reclamado por alguien, cancelado, o cualquier cambio
+        // Cubre: reclamado, cancelado, o cualquier cambio desde buscando
         if (viejoEstado == 'buscando' && nuevoEstado != 'buscando') {
           debugPrint('Pedido exprés removido: $nuevoEstado');
           cargarPedidosExpresDisponibles();
@@ -218,6 +222,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .eq('negocio_id', uid)
           .neq('estado', 'entregado')
           .neq('estado', 'cancelado')
+          .neq('estado', 'rechazado')
           .order('creado_el', ascending: false);
 
       if (_isDisposed) return;
@@ -235,7 +240,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .from('pedidos')
           .select()
           .eq('negocio_id', uid)
-          .or('estado.eq.entregado,estado.eq.cancelado')
+          .or('estado.eq.entregado,estado.eq.cancelado,estado.eq.rechazado')
           .order('creado_el', ascending: false)
           .limit(50);
 
@@ -247,21 +252,32 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
+  // ── CORRECCIÓN: recarga manual inmediata + canal como respaldo ──
   Future<void> actualizarEstadoPedido(
       String idPedido, String nuevoEstado) async {
     try {
       _estaCargando = true;
       _notificar();
+
       Map<String, dynamic> datosActualizar = {'estado': nuevoEstado};
       if (nuevoEstado == 'entregado') {
         datosActualizar['entregado_el'] =
             DateTime.now().toUtc().toIso8601String();
       }
+
       await _supabase
           .from('pedidos')
           .update(datosActualizar)
           .eq('id', idPedido);
-      // El canal _canalMisPedidos detectará el cambio automáticamente
+
+      // Recarga manual inmediata — no espera al canal
+      await cargarPedidosActivos();
+      await cargarEstadisticasHoy();
+      if (nuevoEstado == 'entregado' ||
+          nuevoEstado == 'cancelado' ||
+          nuevoEstado == 'rechazado') {
+        await cargarHistorial();
+      }
     } catch (e) {
       debugPrint('Error actualizando pedido: $e');
     } finally {
@@ -340,7 +356,10 @@ class InicioNegocioViewModel extends ChangeNotifier {
         'estado': 'pendiente',
       }).eq('id', pedidoId);
 
-      // El canal _canalExpres detectará el cambio automáticamente
+      // Recarga manual inmediata
+      await cargarPedidosExpresDisponibles();
+      await cargarPedidosActivos();
+
       return null;
     } catch (e) {
       return 'Error al reclamar el pedido: $e';
@@ -389,7 +408,8 @@ class InicioNegocioViewModel extends ChangeNotifier {
       int pedidosEntregados = 0;
 
       for (var pedido in pedidos) {
-        if (pedido['estado'] != 'cancelado') totalPedidos++;
+        if (pedido['estado'] != 'cancelado' &&
+            pedido['estado'] != 'rechazado') totalPedidos++;
         if (pedido['estado'] == 'entregado') {
           sumaGanancias += (pedido['total'] ?? 0).toDouble();
           if (pedido['entregado_el'] != null &&
