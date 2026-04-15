@@ -54,6 +54,10 @@ class InicioNegocioViewModel extends ChangeNotifier {
     return lista.map((e) => e.toString()).toList();
   }
 
+  // ── Canales de Tiempo Real ──
+  RealtimeChannel? _canalMisPedidos;
+  RealtimeChannel? _canalExpres;
+
   InicioNegocioViewModel() {
     cargarDatosPerfil();
   }
@@ -101,12 +105,69 @@ class InicioNegocioViewModel extends ChangeNotifier {
       await cargarEstadisticasHoy();
       await cargarPedidosActivos();
       await cargarHistorial();
+
+      // Inicializamos los listeners en tiempo real para las tablas
+      _inicializarTiempoReal(uid);
+
     } catch (e) {
       debugPrint('Error crítico cargando perfil: $e');
     } finally {
       _estaCargando = false;
       notifyListeners();
     }
+  }
+
+  // ══════════════════════════════════════════
+  // LÓGICA DE TIEMPO REAL
+  // ══════════════════════════════════════════
+
+  void _inicializarTiempoReal(String uid) {
+    // Limpiar canales anteriores si existen para no duplicar eventos
+    if (_canalMisPedidos != null) _supabase.removeChannel(_canalMisPedidos!);
+    if (_canalExpres != null) _supabase.removeChannel(_canalExpres!);
+
+    // 1. Escuchar los pedidos asignados a esta taquería (nuevos o actualizaciones)
+    _canalMisPedidos = _supabase
+        .channel('mis_pedidos_negocio_$uid')
+        .onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'pedidos',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'negocio_id',
+        value: uid,
+      ),
+      callback: (payload) {
+        debugPrint('Actualización en tiempo real: Mis Pedidos');
+        cargarPedidosActivos();
+        cargarEstadisticasHoy();
+      },
+    ).subscribe();
+
+    // 2. Escuchar la red global de pedidos exprés
+    _canalExpres = _supabase
+        .channel('pedidos_expres_global_$uid')
+        .onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'pedidos',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'tipo',
+        value: 'expres',
+      ),
+      callback: (payload) {
+        // Solo actualizar si el estado involucra "buscando"
+        final nuevoEstado = payload.newRecord['estado'];
+        final viejoEstado = payload.oldRecord['estado'];
+
+        if (nuevoEstado == 'buscando' || viejoEstado == 'buscando') {
+          debugPrint('Actualización en tiempo real: Red Exprés');
+          cargarPedidosExpresDisponibles();
+        }
+      },
+    ).subscribe();
   }
 
   Future<void> recargarPantalla() async {
@@ -169,9 +230,9 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .from('pedidos')
           .update(datosActualizar)
           .eq('id', idPedido);
-      await cargarPedidosActivos();
-      await cargarHistorial();
-      await cargarEstadisticasHoy();
+
+      // Ya no necesitamos llamar a cargarPedidosActivos() o cargarEstadisticasHoy()
+      // de forma manual, el _canalMisPedidos detectará el cambio y lo hará por nosotros.
     } catch (e) {
       debugPrint('Error actualizando pedido: $e');
     } finally {
@@ -257,8 +318,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
         'estado': 'pendiente',
       }).eq('id', pedidoId);
 
-      await cargarPedidosActivos();
-      await cargarPedidosExpresDisponibles();
+      // El _canalMisPedidos y _canalExpres detectarán estos cambios y recargarán las listas
       return null;
     } catch (e) {
       return 'Error al reclamar el pedido: $e';
@@ -285,9 +345,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
 
   double _toRad(double deg) => deg * pi / 180;
 
-  // ══════════════════════════════════════════
   // ESTADÍSTICAS DEL DÍA
-  // ══════════════════════════════════════════
 
   Future<void> cargarEstadisticasHoy() async {
     try {
@@ -335,9 +393,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
-  // ══════════════════════════════════════════
   // PRODUCTOS Y PERFIL
-  // ══════════════════════════════════════════
 
   Future<void> cargarProductos() async {
     try {
@@ -588,6 +644,19 @@ class InicioNegocioViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> cerrarSesion() async =>
-      await _supabase.auth.signOut();
+  Future<void> cerrarSesion() async {
+    await _supabase.auth.signOut();
+  }
+
+  @override
+  void dispose() {
+    // Cerramos los canales en tiempo real para evitar pérdida de memoria
+    if (_canalMisPedidos != null) {
+      _supabase.removeChannel(_canalMisPedidos!);
+    }
+    if (_canalExpres != null) {
+      _supabase.removeChannel(_canalExpres!);
+    }
+    super.dispose();
+  }
 }

@@ -189,20 +189,26 @@ class _PantallaConfirmarPedidoState
                   telefonoContacto: _telefonoCtrl.text.trim(),
                 );
                 if (!mounted) return;
+
                 if (error != null) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text(error),
                       backgroundColor: Colors.red));
                 } else {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => ChangeNotifierProvider.value(
-                            value: vm,
-                            child: PantallaRastrearPedido(
-                                pedidoId: vm.pedidoActivoId!))),
-                        (route) => route.isFirst,
+                  // Mostrar el mensaje de éxito
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        '🌮 Tu pedido ha sido solicitado con éxito, en espera de confirmación de la taquería. Por favor sea paciente.',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      backgroundColor: Colors.green,
+                      duration: Duration(seconds: 4), // Le damos 4 segundos para que lo lea bien
+                    ),
                   );
+
+                  // Volver a la pantalla de inicio del cliente (cierra esta ventana y la lista de taquerías)
+                  Navigator.popUntil(context, (route) => route.isFirst);
                 }
               },
               style: ElevatedButton.styleFrom(
