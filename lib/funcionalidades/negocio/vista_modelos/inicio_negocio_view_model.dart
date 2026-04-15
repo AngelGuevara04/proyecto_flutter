@@ -8,7 +8,6 @@ import 'package:file_picker/file_picker.dart';
 class InicioNegocioViewModel extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
 
-  // ── Bandera de seguridad para evitar errores al destruir la pantalla ──
   bool _isDisposed = false;
 
   int _indiceTab = 0;
@@ -63,11 +62,8 @@ class InicioNegocioViewModel extends ChangeNotifier {
     cargarDatosPerfil();
   }
 
-  // ── FUNCIÓN SEGURA PARA NOTIFICAR (Evita el error 'Used after disposed') ──
   void _notificar() {
-    if (!_isDisposed) {
-      notifyListeners();
-    }
+    if (!_isDisposed) notifyListeners();
   }
 
   void cambiarTab(int indice) {
@@ -115,7 +111,6 @@ class InicioNegocioViewModel extends ChangeNotifier {
       await cargarHistorial();
 
       _inicializarTiempoReal(uid);
-
     } catch (e) {
       debugPrint('Error crítico cargando perfil: $e');
     } finally {
@@ -132,6 +127,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
     if (_canalMisPedidos != null) _supabase.removeChannel(_canalMisPedidos!);
     if (_canalExpres != null) _supabase.removeChannel(_canalExpres!);
 
+    // Canal 1: Escucha cambios en los pedidos ya asignados a esta taquería
     _canalMisPedidos = _supabase
         .channel('mis_pedidos_negocio_$uid')
         .onPostgresChanges(
@@ -144,15 +140,16 @@ class InicioNegocioViewModel extends ChangeNotifier {
         value: uid,
       ),
       callback: (payload) {
-        // Detenemos la ejecución si la pantalla ya se cerró
         if (_isDisposed) return;
-
-        debugPrint('Actualización en tiempo real: Mis Pedidos');
+        debugPrint('Tiempo real: cambio en Mis Pedidos');
         cargarPedidosActivos();
         cargarEstadisticasHoy();
+        cargarHistorial();
       },
-    ).subscribe();
+    )
+        .subscribe();
 
+    // Canal 2: Escucha pedidos exprés globales
     _canalExpres = _supabase
         .channel('pedidos_expres_global_$uid')
         .onPostgresChanges(
@@ -167,15 +164,37 @@ class InicioNegocioViewModel extends ChangeNotifier {
       callback: (payload) {
         if (_isDisposed) return;
 
-        final nuevoEstado = payload.newRecord['estado'];
-        final viejoEstado = payload.oldRecord['estado'];
+        final nuevoEstado = payload.newRecord['estado']?.toString();
+        final viejoEstado = payload.oldRecord['estado']?.toString();
+        final nuevoNegocioId =
+        payload.newRecord['negocio_id']?.toString();
 
-        if (nuevoEstado == 'buscando' || viejoEstado == 'buscando') {
-          debugPrint('Actualización en tiempo real: Red Exprés');
+        debugPrint(
+            'Tiempo real exprés: $viejoEstado → $nuevoEstado | negocio: $nuevoNegocioId');
+
+        // ── Caso 1: Se acaba de crear un pedido exprés nuevo ──
+        if (nuevoEstado == 'buscando') {
+          debugPrint('Nuevo pedido exprés disponible');
           cargarPedidosExpresDisponibles();
         }
+
+        // ── Caso 2: Un pedido exprés fue reclamado por alguien ──
+        if (viejoEstado == 'buscando' && nuevoEstado == 'pendiente') {
+          debugPrint('Pedido exprés reclamado');
+          // Siempre actualizar la lista de disponibles
+          cargarPedidosExpresDisponibles();
+
+          // Si LO RECLAMÓ ESTA TAQUERÍA → actualizar pedidos activos
+          if (nuevoNegocioId == uid) {
+            debugPrint(
+                'Esta taquería reclamó el pedido → actualizando activos');
+            cargarPedidosActivos();
+            cargarEstadisticasHoy();
+          }
+        }
       },
-    ).subscribe();
+    )
+        .subscribe();
   }
 
   Future<void> recargarPantalla() async {
@@ -201,7 +220,7 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .neq('estado', 'cancelado')
           .order('creado_el', ascending: false);
 
-      if (_isDisposed) return; // Evitar que actualice si ya se cerró la app
+      if (_isDisposed) return;
       _pedidosActivos = datos;
       _notificar();
     } catch (e) {
@@ -242,6 +261,8 @@ class InicioNegocioViewModel extends ChangeNotifier {
           .from('pedidos')
           .update(datosActualizar)
           .eq('id', idPedido);
+      // El canal _canalMisPedidos detectará el cambio automáticamente
+      // y llamará cargarPedidosActivos() por tiempo real
     } catch (e) {
       debugPrint('Error actualizando pedido: $e');
     } finally {
@@ -304,6 +325,8 @@ class InicioNegocioViewModel extends ChangeNotifier {
       _notificar();
 
       final uid = _supabase.auth.currentUser!.id;
+
+      // Verificar que nadie más lo haya tomado
       final actual = await _supabase
           .from('pedidos')
           .select('estado')
@@ -314,11 +337,14 @@ class InicioNegocioViewModel extends ChangeNotifier {
         return 'Este pedido ya fue tomado por otra taquería ⚡';
       }
 
+      // Reclamar el pedido
       await _supabase.from('pedidos').update({
         'negocio_id': uid,
         'estado': 'pendiente',
       }).eq('id', pedidoId);
 
+      // El canal _canalExpres detectará el cambio y actualizará
+      // automáticamente tanto la lista exprés como los pedidos activos
       return null;
     } catch (e) {
       return 'Error al reclamar el pedido: $e';
@@ -656,14 +682,9 @@ class InicioNegocioViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    _isDisposed = true; // Levantamos la bandera para que nadie intente actualizar
-
-    if (_canalMisPedidos != null) {
-      _supabase.removeChannel(_canalMisPedidos!);
-    }
-    if (_canalExpres != null) {
-      _supabase.removeChannel(_canalExpres!);
-    }
+    _isDisposed = true;
+    if (_canalMisPedidos != null) _supabase.removeChannel(_canalMisPedidos!);
+    if (_canalExpres != null) _supabase.removeChannel(_canalExpres!);
     super.dispose();
   }
 }
