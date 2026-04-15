@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../vista_modelos/inicio_negocio_view_model.dart';
@@ -29,7 +30,6 @@ class PantallaInicioNegocio extends StatelessWidget {
       body: viewModel.estaCargando
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
           : _construirCuerpo(context, viewModel),
-
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: viewModel.indiceTab,
         onTap: viewModel.cambiarTab,
@@ -66,11 +66,11 @@ class PantallaInicioNegocio extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('¡Hola, ${viewModel.nombreComercial}!', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text('¡Hola, ${viewModel.nombreComercial}!',
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             const Text('Resumen de hoy', style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 20),
-
             Row(
               children: [
                 Expanded(child: _tarjetaResumen('Pedidos Hoy', '${viewModel.pedidosHoy}', Icons.shopping_bag, Colors.blue)),
@@ -79,7 +79,6 @@ class PantallaInicioNegocio extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-
             Card(
               elevation: 2,
               child: Padding(
@@ -92,8 +91,10 @@ class PantallaInicioNegocio extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(viewModel.tiempoPromedioHoy, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                          const Text('Tiempo promedio de entrega (hoy)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          Text(viewModel.tiempoPromedioHoy,
+                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                          const Text('Tiempo promedio de entrega (hoy)',
+                              style: TextStyle(color: Colors.grey, fontSize: 12)),
                         ],
                       ),
                     )
@@ -101,15 +102,13 @@ class PantallaInicioNegocio extends StatelessWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 30),
-
             ListTile(
               onTap: () {
-                Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => ChangeNotifierProvider.value(value: viewModel, child: const PantallaHistorialPedidos()))
-                );
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => ChangeNotifierProvider.value(
+                        value: viewModel,
+                        child: const PantallaHistorialPedidos())));
               },
               leading: const Icon(Icons.history, color: Colors.orange),
               title: const Text('Ver historial de pedidos'),
@@ -156,8 +155,10 @@ class PantallaInicioNegocio extends StatelessWidget {
                 children: [
                   Icon(Icons.receipt_long, size: 80, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text('No tienes pedidos activos', style: TextStyle(fontSize: 18, color: Colors.grey)),
-                  Text('Desliza hacia abajo para actualizar.', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                  Text('No tienes pedidos activos',
+                      style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  Text('Desliza hacia abajo para actualizar.',
+                      style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
                 ],
               ),
             ),
@@ -177,7 +178,12 @@ class PantallaInicioNegocio extends StatelessWidget {
           final pedido = viewModel.pedidosActivos[index];
           final id = pedido['id'].toString();
           final estado = pedido['estado'];
-          final productos = pedido['productos'] as List<dynamic>;
+
+          // ── CORRECCIÓN: parseo seguro de productos ──
+          final productosRaw = pedido['productos'];
+          final productos = productosRaw is String
+              ? jsonDecode(productosRaw) as List<dynamic>
+              : (productosRaw as List<dynamic>? ?? []);
 
           Color colorEstado = Colors.grey;
           if (estado == 'pendiente') colorEstado = Colors.orange;
@@ -197,24 +203,31 @@ class PantallaInicioNegocio extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Pedido #${id.substring(0, 5).toUpperCase()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      Text('Pedido #${id.substring(0, 5).toUpperCase()}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                       Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: colorEstado.withOpacity(0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: colorEstado)),
-                            child: Text(estado.toUpperCase(), style: TextStyle(color: colorEstado, fontWeight: FontWeight.bold, fontSize: 12)),
+                            decoration: BoxDecoration(
+                                color: colorEstado.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: colorEstado)),
+                            child: Text(estado.toUpperCase(),
+                                style: TextStyle(
+                                    color: colorEstado,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12)),
                           ),
                           const SizedBox(width: 8),
-                          // BOTÓN DE REPORTAR EN LA ESQUINA DEL TICKET
                           IconButton(
                             icon: const Icon(Icons.report_problem, color: Colors.redAccent),
                             tooltip: 'Reportar Problema',
                             onPressed: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => ChangeNotifierProvider.value(
-                                  value: viewModel,
-                                  child: PantallaReportarCliente(pedidoActivo: pedido) // Pasamos el pedido completo
-                              )));
+                              Navigator.push(context,
+                                  MaterialPageRoute(builder: (_) => ChangeNotifierProvider.value(
+                                      value: viewModel,
+                                      child: PantallaReportarCliente(pedidoActivo: pedido))));
                             },
                           )
                         ],
@@ -222,26 +235,56 @@ class PantallaInicioNegocio extends StatelessWidget {
                     ],
                   ),
                   const Divider(),
-                  Row(children: [const Icon(Icons.person, size: 16, color: Colors.grey), const SizedBox(width: 8), Text(pedido['nombre_cliente'], style: const TextStyle(fontWeight: FontWeight.bold))]),
+                  Row(children: [
+                    const Icon(Icons.person, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Text(pedido['nombre_cliente'] ?? 'Sin nombre',
+                        style: const TextStyle(fontWeight: FontWeight.bold))
+                  ]),
                   const SizedBox(height: 4),
-                  Row(children: [const Icon(Icons.location_on, size: 16, color: Colors.grey), const SizedBox(width: 8), Expanded(child: Text(pedido['direccion_entrega'], style: const TextStyle(color: Colors.grey)))]),
+                  Row(children: [
+                    const Icon(Icons.location_on, size: 16, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: Text(pedido['direccion_entrega'] ?? 'Sin dirección',
+                            style: const TextStyle(color: Colors.grey)))
+                  ]),
+                  if (pedido['referencias'] != null &&
+                      pedido['referencias'].toString().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Expanded(
+                          child: Text(pedido['referencias'],
+                              style: const TextStyle(color: Colors.grey, fontSize: 12)))
+                    ]),
+                  ],
                   const Divider(),
-                  const Text('Detalle de la orden:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('Detalle de la orden:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   ...productos.map((prod) => Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${prod['cantidad']}x ', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        Expanded(child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(prod['nombre']),
-                            if (prod['detalles'] != null && prod['detalles'].toString().isNotEmpty)
-                              Text(prod['detalles'], style: const TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic)),
-                          ],
-                        )),
+                        Text('${prod['cantidad']}x ',
+                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(prod['nombre'] ?? ''),
+                                if (prod['detalles'] != null &&
+                                    prod['detalles'].toString().isNotEmpty)
+                                  Text(prod['detalles'],
+                                      style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                          fontStyle: FontStyle.italic)),
+                              ],
+                            )),
                       ],
                     ),
                   )),
@@ -249,8 +292,13 @@ class PantallaInicioNegocio extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Total a cobrar:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text('\$${pedido['total']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.green)),
+                      const Text('Total a cobrar:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text('\$${pedido['total']}',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              color: Colors.green)),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -268,20 +316,47 @@ class PantallaInicioNegocio extends StatelessWidget {
     if (estado == 'pendiente') {
       return Row(
         children: [
-          Expanded(child: OutlinedButton(onPressed: () => vm.actualizarEstadoPedido(id, 'cancelado'), style: OutlinedButton.styleFrom(foregroundColor: Colors.red), child: const Text('Rechazar'))),
+          Expanded(
+              child: OutlinedButton(
+                  onPressed: () => vm.actualizarEstadoPedido(id, 'cancelado'),
+                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('Rechazar'))),
           const SizedBox(width: 10),
-          Expanded(child: ElevatedButton(onPressed: () => vm.actualizarEstadoPedido(id, 'aceptado'), style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white), child: const Text('Aceptar'))),
+          Expanded(
+              child: ElevatedButton(
+                  onPressed: () => vm.actualizarEstadoPedido(id, 'aceptado'),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange, foregroundColor: Colors.white),
+                  child: const Text('Aceptar'))),
         ],
       );
     }
     if (estado == 'aceptado') {
-      return ElevatedButton(onPressed: () => vm.actualizarEstadoPedido(id, 'preparacion'), style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(40), backgroundColor: Colors.purple, foregroundColor: Colors.white), child: const Text('Iniciar Preparación'));
+      return ElevatedButton(
+          onPressed: () => vm.actualizarEstadoPedido(id, 'preparacion'),
+          style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(40),
+              backgroundColor: Colors.purple,
+              foregroundColor: Colors.white),
+          child: const Text('Iniciar Preparación'));
     }
     if (estado == 'preparacion') {
-      return ElevatedButton(onPressed: () => vm.actualizarEstadoPedido(id, 'reparto'), style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(40), backgroundColor: Colors.teal, foregroundColor: Colors.white), child: const Text('Enviar a Reparto'));
+      return ElevatedButton(
+          onPressed: () => vm.actualizarEstadoPedido(id, 'reparto'),
+          style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(40),
+              backgroundColor: Colors.teal,
+              foregroundColor: Colors.white),
+          child: const Text('Enviar a Reparto'));
     }
     if (estado == 'reparto') {
-      return ElevatedButton(onPressed: () => vm.actualizarEstadoPedido(id, 'entregado'), style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(40), backgroundColor: Colors.green, foregroundColor: Colors.white), child: const Text('Marcar como Entregado'));
+      return ElevatedButton(
+          onPressed: () => vm.actualizarEstadoPedido(id, 'entregado'),
+          style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(40),
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white),
+          child: const Text('Marcar como Entregado'));
     }
     return const SizedBox.shrink();
   }
@@ -302,7 +377,8 @@ class PantallaInicioNegocio extends StatelessWidget {
                 children: [
                   Icon(Icons.fastfood, size: 80, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text('Tu menú está vacío', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                  Text('Tu menú está vacío',
+                      style: TextStyle(fontSize: 18, color: Colors.grey)),
                   Text('Toca el botón + para agregar un platillo.'),
                 ],
               ),
@@ -316,7 +392,6 @@ class PantallaInicioNegocio extends StatelessWidget {
           itemBuilder: (context, index) {
             final producto = viewModel.productos[index];
             final disponible = producto['disponible'] ?? true;
-
             return Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: ListTile(
@@ -326,12 +401,18 @@ class PantallaInicioNegocio extends StatelessWidget {
                       color: Colors.grey.shade200,
                       borderRadius: BorderRadius.circular(8),
                       image: producto['url_imagen'] != null
-                          ? DecorationImage(image: NetworkImage(producto['url_imagen']), fit: BoxFit.cover)
-                          : null
-                  ),
-                  child: producto['url_imagen'] == null ? const Icon(Icons.fastfood, color: Colors.grey) : null,
+                          ? DecorationImage(
+                          image: NetworkImage(producto['url_imagen']),
+                          fit: BoxFit.cover)
+                          : null),
+                  child: producto['url_imagen'] == null
+                      ? const Icon(Icons.fastfood, color: Colors.grey)
+                      : null,
                 ),
-                title: Text(producto['nombre'], style: TextStyle(decoration: disponible ? null : TextDecoration.lineThrough, color: disponible ? Colors.black : Colors.grey)),
+                title: Text(producto['nombre'],
+                    style: TextStyle(
+                        decoration: disponible ? null : TextDecoration.lineThrough,
+                        color: disponible ? Colors.black : Colors.grey)),
                 subtitle: Text('\$${producto['precio']} • ${producto['categoria']}'),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -339,11 +420,13 @@ class PantallaInicioNegocio extends StatelessWidget {
                     Switch(
                       value: disponible,
                       activeColor: Colors.orange,
-                      onChanged: (val) => viewModel.cambiarDisponibilidadProducto(producto['id'], val),
+                      onChanged: (val) =>
+                          viewModel.cambiarDisponibilidadProducto(producto['id'], val),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _confirmarEliminar(context, viewModel, producto['id']),
+                      onPressed: () =>
+                          _confirmarEliminar(context, viewModel, producto['id']),
                     )
                   ],
                 ),
@@ -360,9 +443,7 @@ class PantallaInicioNegocio extends StatelessWidget {
                   builder: (_) => ChangeNotifierProvider.value(
                     value: viewModel,
                     child: const PantallaAgregarProducto(),
-                  )
-              )
-          );
+                  )));
         },
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
@@ -372,24 +453,26 @@ class PantallaInicioNegocio extends StatelessWidget {
     );
   }
 
-  void _confirmarEliminar(BuildContext context, InicioNegocioViewModel vm, String id) {
+  void _confirmarEliminar(
+      BuildContext context, InicioNegocioViewModel vm, String id) {
     showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('¿Eliminar platillo?'),
           content: const Text('Esto no se puede deshacer.'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar')),
             TextButton(
                 onPressed: () {
                   vm.eliminarProducto(id);
                   Navigator.pop(ctx);
                 },
-                child: const Text('Eliminar', style: TextStyle(color: Colors.red))
-            ),
+                child: const Text('Eliminar',
+                    style: TextStyle(color: Colors.red))),
           ],
-        )
-    );
+        ));
   }
 
   Widget _buildTabPerfil(BuildContext context, InicioNegocioViewModel viewModel) {
@@ -399,8 +482,10 @@ class PantallaInicioNegocio extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text('Configuración Pública', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        const Text('Esto es lo que ven tus clientes.', style: TextStyle(color: Colors.grey)),
+        const Text('Configuración Pública',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const Text('Esto es lo que ven tus clientes.',
+            style: TextStyle(color: Colors.grey)),
         const Divider(height: 30),
         ListTile(
           leading: const Icon(Icons.phone),
@@ -409,7 +494,7 @@ class PantallaInicioNegocio extends StatelessWidget {
         ),
         ListTile(
           leading: const Icon(Icons.timer),
-          title: const Text('Tiempo de Entrega Estimado (Manual)'),
+          title: const Text('Tiempo de Entrega Estimado'),
           subtitle: Text(perfil['tiempo_entrega'] ?? 'N/A'),
         ),
         ListTile(
@@ -418,9 +503,11 @@ class PantallaInicioNegocio extends StatelessWidget {
           subtitle: Text(perfil['direccion_texto'] ?? 'No especificada'),
         ),
         const Divider(height: 30),
-
         ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 12)),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12)),
           onPressed: () {
             Navigator.push(
                 context,
@@ -428,20 +515,18 @@ class PantallaInicioNegocio extends StatelessWidget {
                     builder: (_) => ChangeNotifierProvider.value(
                       value: viewModel,
                       child: const PantallaEditarPerfilNegocio(),
-                    )
-                )
-            );
+                    )));
           },
           icon: const Icon(Icons.edit),
-          label: const Text('Editar Perfil Completo', style: TextStyle(fontSize: 16)),
+          label: const Text('Editar Perfil Completo',
+              style: TextStyle(fontSize: 16)),
         ),
         const SizedBox(height: 12),
         ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blueGrey,
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12)
-          ),
+              padding: const EdgeInsets.symmetric(vertical: 12)),
           onPressed: () {
             Navigator.push(
                 context,
@@ -449,12 +534,11 @@ class PantallaInicioNegocio extends StatelessWidget {
                     builder: (_) => ChangeNotifierProvider.value(
                       value: viewModel,
                       child: const PantallaDetalleNegocioCliente(),
-                    )
-                )
-            );
+                    )));
           },
           icon: const Icon(Icons.preview),
-          label: const Text('Ver como Cliente', style: TextStyle(fontSize: 16)),
+          label: const Text('Ver como Cliente',
+              style: TextStyle(fontSize: 16)),
         )
       ],
     );
