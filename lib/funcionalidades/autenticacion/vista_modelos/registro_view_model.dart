@@ -39,25 +39,24 @@ class RegistroViewModel extends ChangeNotifier {
       String contrasena,
       String confirmarContrasena,
       ) async {
-    // 1. Validaciones de campos vacíos
-    if (nombre.isEmpty || apellidoPat.isEmpty || apellidoMat.isEmpty || correo.isEmpty || contrasena.isEmpty) {
+    if (nombre.isEmpty ||
+        apellidoPat.isEmpty ||
+        apellidoMat.isEmpty ||
+        correo.isEmpty ||
+        contrasena.isEmpty) {
       return 'Por favor completa todos los campos';
     }
 
-    // 2. Validación de longitud (Mínimo 6 caracteres)
     if (contrasena.length < 6) {
       return 'La contraseña debe tener al menos 6 caracteres';
     }
 
-    // 3. Validación de complejidad (Letras y Números)
     final tieneLetras = contrasena.contains(RegExp(r'[a-zA-Z]'));
     final tieneNumeros = contrasena.contains(RegExp(r'[0-9]'));
-
     if (!tieneLetras || !tieneNumeros) {
       return 'La contraseña debe combinar letras y números';
     }
 
-    // 4. Validación de coincidencia
     if (contrasena != confirmarContrasena) {
       return 'Las contraseñas no coinciden';
     }
@@ -71,29 +70,27 @@ class RegistroViewModel extends ChangeNotifier {
       await _supabase.auth.signUp(
         email: correo,
         password: contrasena,
-        // =================================================================
-        // AQUÍ ESTÁ EL ENLACE MÁGICO PARA EL DEEP LINKING
         emailRedirectTo: 'tacohub://login',
-        // =================================================================
         data: {
           'first_name': nombre,
           'paternal_last_name': apellidoPat,
           'maternal_last_name': apellidoMat,
           'full_name': '$nombre $apellidoPat $apellidoMat',
           'rol': rolAsignado,
-          // Agregamos los metadatos para que el SemaforoPrincipal los lea al entrar:
-          'estatus_aprobacion': rolAsignado == 'negocio' ? 'pendiente' : 'aprobado',
+          // Negocio arranca sin solicitud enviada
+          // El estatus cambia a 'pendiente' cuando envía documentos
+          'estatus_aprobacion':
+          rolAsignado == 'negocio' ? 'sin_solicitud' : 'aprobado',
           'perfil_completado': false,
           'suspendido': false,
         },
       );
 
-      return null; // Éxito
+      return null;
     } on AuthException catch (error) {
       if (error.message == 'User already registered') {
         return 'Este correo ya está registrado';
       }
-
       return error.message;
     } catch (error) {
       return 'Ocurrió un error inesperado';
